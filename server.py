@@ -67,21 +67,21 @@ async def run_sprint_background(goal: str):
 async def serve_index():
     index_path = os.path.join(BASE_DIR, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        return FileResponse(index_path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     raise HTTPException(status_code=404, detail="index.html not found")
 
 @app.get("/index.css")
 async def serve_css():
     css_path = os.path.join(BASE_DIR, "index.css")
     if os.path.exists(css_path):
-        return FileResponse(css_path)
+        return FileResponse(css_path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     raise HTTPException(status_code=404, detail="index.css not found")
 
 @app.get("/app.js")
 async def serve_js():
     js_path = os.path.join(BASE_DIR, "app.js")
     if os.path.exists(js_path):
-        return FileResponse(js_path)
+        return FileResponse(js_path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     raise HTTPException(status_code=404, detail="app.js not found")
 
 # --------------------------------------------------------------------
