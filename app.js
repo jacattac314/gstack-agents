@@ -40,6 +40,7 @@ const githubStatusDot = document.getElementById("github-status-dot");
 const githubStatusText = document.getElementById("github-status-text");
 const githubRepoName = document.getElementById("github-repo-name");
 const githubRepoSelect = document.getElementById("github-repo-select");
+const githubRepoDesc = document.getElementById("github-repo-desc");
 const githubSyncAction = document.getElementById("github-sync-action");
 const githubSyncBtn = document.getElementById("github-sync-btn");
 const githubFeedback = document.getElementById("github-feedback");
@@ -116,9 +117,11 @@ function toggleSyncActionFields() {
   if (action === "connect") {
     githubRepoSelect.style.display = "block";
     githubRepoName.style.display = "none";
+    githubRepoDesc.style.display = "none";
   } else {
     githubRepoSelect.style.display = "none";
     githubRepoName.style.display = "block";
+    githubRepoDesc.style.display = "block";
   }
 }
 
@@ -233,11 +236,13 @@ async function loginGitHub() {
 async function syncGitHubProject() {
   const action = githubSyncAction.value;
   let repoName = "";
+  let description = "";
   
   if (action === "connect") {
     repoName = githubRepoSelect.value;
   } else {
     repoName = githubRepoName.value.trim();
+    description = githubRepoDesc.value.trim();
   }
 
   if (!repoName) {
@@ -255,7 +260,7 @@ async function syncGitHubProject() {
     const res = await fetch(`${API_BASE}/api/github/sync?_=${Date.now()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, repo_name: repoName })
+      body: JSON.stringify({ action, repo_name: repoName, description })
     });
     const data = await res.json();
 
@@ -269,6 +274,10 @@ async function syncGitHubProject() {
       
       // Reset fetched repos list to force reload new repo addition on next status check
       fetchedRepos = [];
+      
+      // Clear inputs
+      githubRepoName.value = "";
+      githubRepoDesc.value = "";
       
       // Immediately refresh workspace files tree
       fetchWorkspaceFiles();

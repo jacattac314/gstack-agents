@@ -303,14 +303,19 @@ async def api_github_sync(payload: dict):
     # 2. Create Action
     elif action == "create":
         try:
-            # Create repo on GitHub
+            # Create repo on GitHub with optional description
+            desc_val = payload.get("description", "").strip()
+            clean_desc = desc_val.replace('"', '\\"')
+            desc_flag = f'--description "{clean_desc}"' if clean_desc else ""
+            
             res = subprocess.run(
-                f"gh repo create {repo_name} --public",
+                f"gh repo create {repo_name} --public {desc_flag}",
                 shell=True,
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                timeout=15
             )
             if res.returncode != 0 and "already exists" not in (res.stderr + res.stdout):
                 raise Exception(res.stderr or "GitHub repository creation failed")
@@ -329,7 +334,8 @@ async def api_github_sync(payload: dict):
             readme_path = os.path.join(WORKSPACE_DIR, "README.md")
             if not os.listdir(WORKSPACE_DIR) or not os.path.exists(readme_path):
                 with open(readme_path, "w") as f:
-                    f.write(f"# {repo_name}\n\nAutomated workspace project created via local GStack Agent stack.\n")
+                    desc_para = f"\n{desc_val}\n" if desc_val else ""
+                    f.write(f"# {repo_name}\n{desc_para}\nAutomated workspace project created via local GStack Agent stack.\n")
                     
             # Stage, commit, and push initial commit
             subprocess.run("git add .", shell=True, cwd=WORKSPACE_DIR)
