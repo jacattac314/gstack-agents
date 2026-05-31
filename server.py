@@ -2,6 +2,7 @@ import os
 import json
 import subprocess
 import re
+import shutil
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,23 @@ app.add_middleware(
 
 # State variable for active background task
 active_sprint_task = None
+
+# Load credentials from .env if exists on startup
+ENV_FILE_PATH = os.path.join(BASE_DIR, ".env")
+def load_github_token():
+    if os.path.exists(ENV_FILE_PATH):
+        try:
+            with open(ENV_FILE_PATH, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and "=" in line and not line.startswith("#"):
+                        key, val = line.split("=", 1)
+                        if key.strip() in ["GITHUB_TOKEN", "GH_TOKEN"]:
+                            os.environ[key.strip()] = val.strip().strip('"').strip("'")
+        except Exception:
+            pass
+
+load_github_token()
 
 # Helper to run the sprint in background
 async def run_sprint_background(goal: str):
@@ -82,26 +100,39 @@ async def api_github_status():
                 text=True
             )
             if res.returncode == 0 and res.stdout:
-                active_repo = res.stdout.strip()
+                # Redact token from url for security
+                url = res.stdout.strip()
+                redacted_url = re.sub(r"https://[^@]+@", "https://", url)
+                active_repo = redacted_url
         except Exception:
             pass
             
-    # Check gh CLI authentication status
+    # Check gh CLI authentication status using environment token
     gh_user = "Unknown"
     is_authenticated = False
+    
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    
+    env = os.environ.copy()
+    if token:
+        env["GH_TOKEN"] = token
+        env["GITHUB_TOKEN"] = token
+        
     try:
         res = subprocess.run(
-            "env -u GITHUB_TOKEN gh auth status",
+            "gh auth status",
             shell=True,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
         )
-        # gh auth status outputs to stderr typically
         output = res.stderr + "\n" + res.stdout
         match = re.search(r"Logged in to github\.com account ([a-zA-Z0-9_-]+)", output)
         if match:
             gh_user = match.group(1)
+            is_authenticated = True
+        elif "Logged in to github.com" in output:
             is_authenticated = True
     except Exception:
         pass
@@ -114,68 +145,115 @@ async def api_github_status():
 
 @app.post("/api/github/login")
 async def api_github_login(payload: dict):
-    """Pipes a GitHub Personal Access Token (PAT) directly into gh auth login."""
+    """Saves a GitHub Personal Access Token (PAT) locally and verifies it."""
     token = payload.get("token")
     if not token:
         raise HTTPException(status_code=400, detail="Missing GitHub Personal Access Token (PAT)")
         
     try:
-        # Pipe token to gh CLI auth login
-        process = subprocess.Popen(
-            ["env", "-u", "GITHUB_TOKEN", "gh", "auth", "login", "--with-token"],
-            stdin=subprocess.PIPE,
+        # Verify the token by checking gh auth status using this token
+        env = os.environ.copy()
+        env["GH_TOKEN"] = token
+        env["GITHUB_TOKEN"] = token
+        
+        res = subprocess.run(
+            "gh auth status",
+            shell=True,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
         )
-        stdout, stderr = process.communicate(input=token)
-        
-        if process.returncode != 0:
-            raise Exception(stderr or stdout or "gh auth login command failed")
+        output = res.stderr + "\n" + res.stdout
+        match = re.search(r"Logged in to github\.com account ([a-zA-Z0-9_-]+)", output)
+        if not match:
+            # Fallback check
+            if "Active account: true" not in output and "Logged in to github.com" not in output:
+                raise Exception("The provided token is invalid or unauthorized by GitHub.")
+            username = "jacattac314"
+        else:
+            username = match.group(1)
             
-        # Get updated status
-        status = await api_github_status()
+        # Write token to .env
+        with open(ENV_FILE_PATH, "w") as f:
+            f.write(f"GITHUB_TOKEN={token}\n")
+            f.write(f"GH_TOKEN={token}\n")
+            
+        # Set active environment variables
+        os.environ["GITHUB_TOKEN"] = token
+        os.environ["GH_TOKEN"] = token
+        
+        # If origin exists in workspace, update it to use token
+        git_dir = os.path.join(WORKSPACE_DIR, ".git")
+        if os.path.exists(git_dir):
+            try:
+                res_url = subprocess.run(
+                    "git remote get-url origin",
+                    shell=True,
+                    cwd=WORKSPACE_DIR,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                if res_url.returncode == 0 and res_url.stdout:
+                    url = res_url.stdout.strip()
+                    # Strip existing credentials and re-inject new token
+                    clean_url = re.sub(r"https://[^@]+@", "https://", url)
+                    repo_path = clean_url.replace("https://github.com/", "")
+                    authed_url = f"https://{username}:{token}@github.com/{repo_path}"
+                    subprocess.run(f"git remote set-url origin {authed_url}", shell=True, cwd=WORKSPACE_DIR)
+            except Exception:
+                pass
+                
         return {
             "status": "success",
-            "message": "Successfully authenticated with GitHub!",
-            "username": status.get("username")
+            "message": "Token verified and securely linked!",
+            "username": username
         }
     except Exception as e:
         return {
             "status": "error",
-            "message": f"GitHub login failed: {str(e)}"
+            "message": f"Authentication failed: {str(e)}"
         }
 
 @app.post("/api/github/sync")
 async def api_github_sync(payload: dict):
-    """Clones an existing repository or creates a new one on GitHub."""
+    """Clones an existing repository or creates a new one on GitHub using authenticated token."""
     action = payload.get("action") # "create" or "connect"
     repo_name = payload.get("repo_name")
     
     if not repo_name or not action:
         raise HTTPException(status_code=400, detail="Missing 'action' or 'repo_name'")
         
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise HTTPException(status_code=401, detail="Please authenticate with a GitHub PAT first")
+        
     # Clean repo name from symbols
     repo_name = re.sub(r"[^a-zA-Z0-9_-]", "", repo_name)
+    
+    status_res = await api_github_status()
+    username = status_res.get("username", "jacattac314")
+    
+    env = os.environ.copy()
+    env["GH_TOKEN"] = token
+    env["GITHUB_TOKEN"] = token
     
     # 1. Connect (Clone) Action
     if action == "connect":
         try:
             # Safely recreate workspace directory
-            import shutil
             if os.path.exists(WORKSPACE_DIR):
                 shutil.rmtree(WORKSPACE_DIR)
             os.makedirs(WORKSPACE_DIR, exist_ok=True)
             
-            # Fetch default username
-            status_res = await api_github_status()
-            username = status_res.get("username", "jacattac314")
+            # Embed username and token in clone URL to guarantee passwordless credentials
+            clone_url = f"https://{username}:{token}@github.com/{username}/{repo_name}.git"
             
-            # Run git clone
-            clone_url = f"https://github.com/{username}/{repo_name}.git"
             res = subprocess.run(
                 f"git clone {clone_url} .",
                 shell=True,
+                env=env,
                 cwd=WORKSPACE_DIR,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -186,7 +264,7 @@ async def api_github_sync(payload: dict):
                 
             return {
                 "status": "success",
-                "message": f"Successfully cloned remote repository: {clone_url}"
+                "message": f"Successfully cloned remote repository as @{username}!"
             }
         except Exception as e:
             return {
@@ -199,8 +277,9 @@ async def api_github_sync(payload: dict):
         try:
             # Create repo on GitHub
             res = subprocess.run(
-                f"env -u GITHUB_TOKEN gh repo create {repo_name} --public",
+                f"gh repo create {repo_name} --public",
                 shell=True,
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
@@ -211,15 +290,11 @@ async def api_github_sync(payload: dict):
             # Initialize Git inside workspace
             subprocess.run("git init", shell=True, cwd=WORKSPACE_DIR)
             
-            # Fetch remote url
-            status_res = await api_github_status()
-            username = status_res.get("username", "jacattac314")
-            remote_url = f"https://github.com/{username}/{repo_name}.git"
-            
             # Remove existing remote if it exists
             subprocess.run("git remote remove origin", shell=True, cwd=WORKSPACE_DIR)
             
-            # Add remote origin
+            # Add authenticated remote origin
+            remote_url = f"https://{username}:{token}@github.com/{username}/{repo_name}.git"
             subprocess.run(f"git remote add origin {remote_url}", shell=True, cwd=WORKSPACE_DIR)
             
             # Create a base README.md if workspace is empty
@@ -234,8 +309,9 @@ async def api_github_sync(payload: dict):
             subprocess.run("git branch -M main", shell=True, cwd=WORKSPACE_DIR)
             
             push_res = subprocess.run(
-                "env -u GITHUB_TOKEN git push -u origin main",
+                "git push -u origin main",
                 shell=True,
+                env=env,
                 cwd=WORKSPACE_DIR,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -246,7 +322,7 @@ async def api_github_sync(payload: dict):
                 
             return {
                 "status": "success",
-                "message": f"Successfully created and synced remote repository: {remote_url}"
+                "message": f"Successfully created and pushed remote repository: https://github.com/{username}/{repo_name}"
             }
         except Exception as e:
             return {
