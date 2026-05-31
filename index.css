@@ -627,3 +627,9 @@ body {
   background-color: var(--color-yellow);
   box-shadow: 0 0 8px var(--color-yellow);
 }
+
+.panel-divider {
+  border: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}

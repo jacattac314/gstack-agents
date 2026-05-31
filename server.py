@@ -112,6 +112,40 @@ async def api_github_status():
         "active_repo": active_repo
     }
 
+@app.post("/api/github/login")
+async def api_github_login(payload: dict):
+    """Pipes a GitHub Personal Access Token (PAT) directly into gh auth login."""
+    token = payload.get("token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing GitHub Personal Access Token (PAT)")
+        
+    try:
+        # Pipe token to gh CLI auth login
+        process = subprocess.Popen(
+            ["env", "-u", "GITHUB_TOKEN", "gh", "auth", "login", "--with-token"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        stdout, stderr = process.communicate(input=token)
+        
+        if process.returncode != 0:
+            raise Exception(stderr or stdout or "gh auth login command failed")
+            
+        # Get updated status
+        status = await api_github_status()
+        return {
+            "status": "success",
+            "message": "Successfully authenticated with GitHub!",
+            "username": status.get("username")
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"GitHub login failed: {str(e)}"
+        }
+
 @app.post("/api/github/sync")
 async def api_github_sync(payload: dict):
     """Clones an existing repository or creates a new one on GitHub."""

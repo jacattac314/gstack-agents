@@ -35,13 +35,19 @@ const metricSavings = document.getElementById("metric-savings");
 
 const tabButtons = document.querySelectorAll(".tab-btn");
 
-// GitHub Elements
+// GitHub DOM Elements
 const githubStatusDot = document.getElementById("github-status-dot");
 const githubStatusText = document.getElementById("github-status-text");
 const githubRepoName = document.getElementById("github-repo-name");
 const githubSyncAction = document.getElementById("github-sync-action");
 const githubSyncBtn = document.getElementById("github-sync-btn");
 const githubFeedback = document.getElementById("github-feedback");
+
+const githubLoginSection = document.getElementById("github-login-section");
+const githubLoginBtn = document.getElementById("github-login-btn");
+const githubPatToken = document.getElementById("github-pat-token");
+const githubSyncSection = document.getElementById("github-sync-section");
+const githubDivider = document.getElementById("github-divider");
 
 // --------------------------------------------------------------------
 // 1. Initial Handshake & Setup
@@ -85,6 +91,9 @@ function setupEventListeners() {
 
   // GitHub Sync Button
   githubSyncBtn.addEventListener("click", syncGitHubProject);
+
+  // GitHub Login Button
+  githubLoginBtn.addEventListener("click", loginGitHub);
 }
 
 // --------------------------------------------------------------------
@@ -127,8 +136,49 @@ async function launchSprint() {
 }
 
 // --------------------------------------------------------------------
-// 4. GitHub Project Sync Action
+// 4. GitHub Actions (Login & Sync)
 // --------------------------------------------------------------------
+async function loginGitHub() {
+  const token = githubPatToken.value.trim();
+  if (!token) {
+    githubFeedback.textContent = "Error: Please enter a Personal Access Token!";
+    githubFeedback.style.color = "var(--color-red)";
+    return;
+  }
+
+  githubLoginBtn.disabled = true;
+  githubLoginBtn.textContent = "Authenticating... ⚡";
+  githubFeedback.textContent = "Verifying token credentials...";
+  githubFeedback.style.color = "var(--color-yellow)";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/github/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+
+    if (data.status === "success") {
+      githubFeedback.textContent = `Linked successfully! Connected as @${data.username}`;
+      githubFeedback.style.color = "var(--color-green)";
+      githubPatToken.value = "";
+      
+      // Instantly refresh states to swap panels
+      await fetchGitHubStatus();
+    } else {
+      githubFeedback.textContent = `Auth failed: ${data.message}`;
+      githubFeedback.style.color = "var(--color-red)";
+    }
+  } catch (e) {
+    githubFeedback.textContent = `Auth error: ${e}`;
+    githubFeedback.style.color = "var(--color-red)";
+  } finally {
+    githubLoginBtn.disabled = false;
+    githubLoginBtn.textContent = "Link GitHub Token 🔑";
+  }
+}
+
 async function syncGitHubProject() {
   const repoName = githubRepoName.value.trim();
   const action = githubSyncAction.value;
@@ -156,7 +206,6 @@ async function syncGitHubProject() {
       githubFeedback.textContent = data.message;
       githubFeedback.style.color = "var(--color-green)";
       
-      // Auto-populate composer prompt suggestion
       if (action === "connect") {
         composerTextarea.placeholder = `Connected to remote repo. Suggest goals like: 'Inspect the files and fix any bugs in README.md' or 'Add a unit test script'`;
       }
@@ -186,6 +235,11 @@ async function fetchGitHubStatus() {
       githubStatusDot.className = "status-dot green";
       githubStatusText.textContent = `@${data.username} (Connected)`;
       
+      // Connected State: Hide login inputs, show sync controllers
+      githubLoginSection.style.display = "none";
+      githubSyncSection.style.display = "flex";
+      githubDivider.style.display = "block";
+      
       if (data.active_repo && data.active_repo !== "Not Configured") {
         const repoNameOnly = data.active_repo.split("/").pop().replace(".git", "");
         githubRepoName.value = repoNameOnly;
@@ -193,7 +247,12 @@ async function fetchGitHubStatus() {
       }
     } else {
       githubStatusDot.className = "status-dot red";
-      githubStatusText.textContent = "Disconnected (Run: gh auth login)";
+      githubStatusText.textContent = "Disconnected";
+      
+      // Disconnected State: Show login inputs, hide sync controllers
+      githubLoginSection.style.display = "flex";
+      githubSyncSection.style.display = "none";
+      githubDivider.style.display = "none";
     }
   } catch (e) {
     githubStatusDot.className = "status-dot red";

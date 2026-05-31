@@ -98,15 +98,25 @@
         
         <!-- GitHub Sync Panel -->
         <div class="glass-card panel-card padding-lg">
-          <h2 class="panel-title">GitHub Project Sync</h2>
-          <p class="panel-desc">Clone an existing GitHub repository to build inside, or create a brand new repo dynamically.</p>
+          <h2 class="panel-title">GitHub Control Center</h2>
+          <p class="panel-desc">Manage your GitHub credentials and synchronize local workspaces.</p>
           <div class="github-sync-panel margin-top-md">
+            <!-- Active Connection Banner -->
             <div class="github-status-row">
               <span class="status-dot red" id="github-status-dot"></span>
               <span class="status-text" id="github-status-text">Checking credentials...</span>
             </div>
             
-            <div class="margin-top-sm flex-col gap-sm">
+            <!-- Login Segment -->
+            <div class="margin-top-sm flex-col gap-sm" id="github-login-section">
+              <input type="password" id="github-pat-token" class="premium-input" placeholder="GitHub Personal Access Token (PAT)">
+              <button id="github-login-btn" class="glow-button">Link GitHub Token 🔑</button>
+            </div>
+
+            <hr class="panel-divider margin-top-sm" id="github-divider" style="display:none;" />
+
+            <!-- Project Sync Segment -->
+            <div class="margin-top-sm flex-col gap-sm" id="github-sync-section" style="display:none;">
               <input type="text" id="github-repo-name" class="premium-input" placeholder="Repository Name (e.g. neon-timer)">
               
               <select id="github-sync-action" class="premium-select">
