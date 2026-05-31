@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Countdown Timer</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #111;
+            font-family: Arial, sans-serif;
+        }
+        #timer {
+            color: #0ff;
+            font-size: 8rem;
+            text-shadow:
+                0 0 5px #0ff,
+                0 0 10px #0ff,
+                0 0 20px #0ff,
+                0 0 40px #0ff,
+                0 0 80px #0ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="timer">Loading...</div>
+
+    <script>
+        // Set the target time in milliseconds (e.g., 10 seconds from now)
+        const targetDate = new Date().getTime() + 10 * 1000; // 10 seconds
+
+        const timerElement = document.getElementById('timer');
+
+        function updateTimer() {
+            const now = new Date().getTime();
+            const distance = targetDate - now;
+
+            if (distance <= 0) {
+                clearInterval(countdown);
+                timerElement.textContent = "00:00";
+                return;
+            }
+
+            const minutes = Math.floor(distance / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            // Pad with leading zeros
+            const minsStr = String(minutes).padStart(2, '0');
+            const secsStr = String(seconds).padStart(2, '0');
+
+            timerElement.textContent = `${minsStr}:${secsStr}`;
+        }
+
+        // Update every second
+        const countdown = setInterval(updateTimer, 1000);
+        updateTimer(); // Initial call
+    </script>
+</body>
+</html>

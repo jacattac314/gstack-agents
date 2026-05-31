@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GStack Local Agent Workbench</title>
+  <!-- Google Fonts: Inter & JetBrains Mono for Code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+  <!-- Background Animated Cyber Glows -->
+  <div class="glow glow-cyan"></div>
+  <div class="glow glow-purple"></div>
+
+  <!-- Main Container -->
+  <div class="dashboard-container">
+    
+    <!-- 1. Header Area -->
+    <header class="dashboard-header glass-card">
+      <div class="header-logo">
+        <span class="logo-icon">⚡</span>
+        <h1>gStack <span class="tagline">Local Virtual Eng Team</span></h1>
+      </div>
+      <div class="header-meta">
+        <div class="model-badge">
+          <span class="badge-dot pulse-dot"></span>
+          <span class="badge-label">Model: <strong id="active-model-id">Resolving model...</strong></span>
+        </div>
+        <div class="connection-status">
+          <span class="status-dot"></span>
+          <span class="status-label">LM Link: Connected (Jacks-Mac-Studio)</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. Sprint Timeline Stages -->
+    <section class="timeline-container glass-card">
+      <div class="timeline-nodes">
+        <div class="node" id="node-think">
+          <div class="node-icon">🧠</div>
+          <div class="node-label">Think</div>
+          <div class="node-sub">CEO Agent</div>
+        </div>
+        <div class="timeline-connector"></div>
+        
+        <div class="node" id="node-plan">
+          <div class="node-icon">📋</div>
+          <div class="node-label">Plan</div>
+          <div class="node-sub">Eng Manager</div>
+        </div>
+        <div class="timeline-connector"></div>
+
+        <div class="node" id="node-design">
+          <div class="node-icon">🎨</div>
+          <div class="node-label">Design</div>
+          <div class="node-sub">Designer</div>
+        </div>
+        <div class="timeline-connector"></div>
+
+        <div class="node" id="node-build">
+          <div class="node-icon">🔨</div>
+          <div class="node-label">Build</div>
+          <div class="node-sub">Coder Agent</div>
+        </div>
+        <div class="timeline-connector"></div>
+
+        <div class="node" id="node-review">
+          <div class="node-icon">🔍</div>
+          <div class="node-label">Review</div>
+          <div class="node-sub">Release Eng</div>
+        </div>
+        <div class="timeline-connector"></div>
+
+        <div class="node" id="node-test">
+          <div class="node-icon">🧪</div>
+          <div class="node-label">Test</div>
+          <div class="node-sub">QA Lead</div>
+        </div>
+        <div class="timeline-connector"></div>
+
+        <div class="node" id="node-ship">
+          <div class="node-icon">🚀</div>
+          <div class="node-label">Ship</div>
+          <div class="node-sub">Release Eng</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Grid Workspace -->
+    <main class="dashboard-grid">
+      
+      <!-- COLUMN 1: Control Center & Telemetry -->
+      <aside class="grid-col flex-col gap-md">
+        
+        <!-- Sprint Composer -->
+        <div class="glass-card panel-card padding-lg">
+          <h2 class="panel-title">Sprint Composer</h2>
+          <p class="panel-desc">Submit a high-level software objective and watch your local agent sprint team execute it stage by stage.</p>
+          <div class="composer-composer margin-top-md">
+            <textarea id="composer-textarea" placeholder="e.g. Create a single-page index.html file with a gorgeous neon countdown timer for a product launch page. Include high-end hover effects and animations..."></textarea>
+            <button id="sprint-start-btn" class="glow-button">Launch Sprint ⚡</button>
+          </div>
+        </div>
+
+        <!-- Dynamic HUD Metrics -->
+        <div class="glass-card panel-card padding-lg">
+          <h2 class="panel-title">Telemetry & Cost HUD</h2>
+          <div class="metrics-grid margin-top-md">
+            <div class="metric-card">
+              <span class="metric-label">Total Sprints</span>
+              <span class="metric-value" id="metric-runs">0</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Accumulated Savings</span>
+              <span class="metric-value color-green" id="metric-savings">$0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Latency Chart SVG -->
+        <div class="glass-card panel-card padding-lg">
+          <h2 class="panel-title">Phase Execution Latency (seconds)</h2>
+          <div class="chart-container margin-top-md">
+            <svg id="latency-svg" viewBox="0 0 300 120">
+              <!-- Background grid lines -->
+              <line x1="10" y1="20" x2="290" y2="20" stroke="rgba(255,255,255,0.05)" stroke-dasharray="3"/>
+              <line x1="10" y1="60" x2="290" y2="60" stroke="rgba(255,255,255,0.05)" stroke-dasharray="3"/>
+              <line x1="10" y1="100" x2="290" y2="100" stroke="rgba(255,255,255,0.05)" />
+              <!-- Placeholder text if empty -->
+              <text x="150" y="65" fill="rgba(255,255,255,0.3)" font-size="10" text-anchor="middle" id="chart-placeholder">Waiting for sprint data...</text>
+              <!-- Sparkline path -->
+              <path id="sparkline-path" fill="none" stroke="hsl(180, 100%, 50%)" stroke-width="2" d=""/>
+              <!-- Area under sparkline -->
+              <path id="sparkline-area" fill="rgba(6,182,212,0.15)" stroke="none" d=""/>
+            </svg>
+          </div>
+        </div>
+      </aside>
+
+      <!-- COLUMN 2: Agent Terminal Grid -->
+      <section class="grid-col flex-col glass-card panel-card">
+        
+        <!-- Tab Bar -->
+        <div class="terminal-tab-bar">
+          <button class="tab-btn active" data-agent="ceo">🧠 CEO</button>
+          <button class="tab-btn" data-agent="eng_manager">📋 EM</button>
+          <button class="tab-btn" data-agent="designer">🎨 Designer</button>
+          <button class="tab-btn" data-agent="coder">🔨 Coder</button>
+          <button class="tab-btn" data-agent="release_engineer">🔍 Review</button>
+          <button class="tab-btn" data-agent="qa_lead">🧪 QA</button>
+        </div>
+
+        <!-- Terminal Console -->
+        <div class="terminal-console">
+          <div class="terminal-header">
+            <div class="window-dot red"></div>
+            <div class="window-dot yellow"></div>
+            <div class="window-dot green"></div>
+            <span class="terminal-title" id="terminal-name">TERMINAL: ceo_agent</span>
+            <div class="terminal-spinner" id="terminal-pulse" style="display:none;"></div>
+          </div>
+          <div class="terminal-body" id="terminal-output">
+Waiting to launch GStack local agents... Ready.
+          </div>
+        </div>
+      </section>
+
+      <!-- COLUMN 3: Workspace Files & Code Inspector -->
+      <section class="grid-col flex-col gap-md">
+        
+        <!-- Files Inspector -->
+        <div class="glass-card panel-card padding-lg flex-grow-1 flex-col">
+          <h2 class="panel-title">Workspace Output Files</h2>
+          <p class="panel-desc">Real-time local files created or edited inside your physical workspace.</p>
+          <div class="workspace-tree flex-grow-1 margin-top-md" id="workspace-tree">
+            <span class="empty-state">No files built in workspace yet.</span>
+          </div>
+        </div>
+
+        <!-- Code Preview Console -->
+        <div class="glass-card panel-card padding-lg flex-grow-2 flex-col">
+          <h2 class="panel-title" id="preview-file-title">File Code Viewer</h2>
+          <div class="code-viewer-container flex-grow-1 margin-top-sm">
+            <pre class="code-viewer-body" id="preview-file-content">Select a file from the workspace above to inspect its code contents in real time.</pre>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

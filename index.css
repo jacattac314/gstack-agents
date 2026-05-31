@@ -1,0 +1,562 @@
+/* ====================================================================
+   1. Premium Design System, Variables & Theme Tokens
+   ==================================================================== */
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Harmonious Cyberpunk Neon HSL Color Palette */
+  --bg-main: #070B13;
+  --bg-card: rgba(13, 21, 38, 0.65);
+  --border-card: rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(6, 182, 212, 0.2);
+
+  --color-cyan: hsl(180, 100%, 50%);
+  --color-cyan-glow: hsla(180, 100%, 50%, 0.25);
+  --color-purple: hsl(270, 80%, 60%);
+  --color-purple-glow: hsla(270, 80%, 60%, 0.25);
+  --color-green: hsl(140, 100%, 45%);
+  --color-red: hsl(0, 85%, 60%);
+  --color-yellow: hsl(45, 100%, 55%);
+
+  --color-text-primary: #E2E8F0;
+  --color-text-secondary: #94A3B8;
+  --color-text-dim: #64748B;
+
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+}
+
+/* ====================================================================
+   2. Reset & Layout Setup
+   ==================================================================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  padding: 24px;
+}
+
+/* Animated Neon Background Glow Nodes */
+.glow {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  filter: blur(150px);
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.45;
+  animation: floatGlow 15s infinite alternate ease-in-out;
+}
+.glow-cyan {
+  background: var(--color-cyan);
+  top: -10%;
+  left: -5%;
+}
+.glow-purple {
+  background: var(--color-purple);
+  bottom: -10%;
+  right: -5%;
+  animation-delay: -5s;
+}
+
+@keyframes floatGlow {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(100px, 50px) scale(1.2); }
+  100% { transform: translate(-50px, 100px) scale(0.9); }
+}
+
+/* ====================================================================
+   3. Glassmorphic Cards & UI Panels
+   ==================================================================== */
+.glass-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  box-shadow: var(--shadow-premium);
+  transition: border var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.padding-lg { padding: 24px; }
+.padding-md { padding: 16px; }
+.margin-top-sm { margin-top: 8px; }
+.margin-top-md { margin-top: 16px; }
+.flex-col { display: flex; flex-direction: column; }
+.flex-grow-1 { flex-grow: 1; }
+.flex-grow-2 { flex-grow: 2; }
+.gap-md { gap: 16px; }
+
+/* Dashboard Container */
+.dashboard-container {
+  max-width: 1680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ====================================================================
+   4. Header Styles
+   ==================================================================== */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 28px;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  font-size: 24px;
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.header-logo h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.tagline {
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--color-text-dim);
+  margin-left: 8px;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.model-badge, .connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+}
+
+.badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-cyan);
+}
+.pulse-dot {
+  animation: pulseDot 2s infinite ease-in-out;
+}
+@keyframes pulseDot {
+  0% { transform: scale(0.9); opacity: 0.6; box-shadow: 0 0 0 0 var(--color-cyan-glow); }
+  50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 8px 3px var(--color-cyan-glow); }
+  100% { transform: scale(0.9); opacity: 0.6; box-shadow: 0 0 0 0 var(--color-cyan-glow); }
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-green);
+  box-shadow: 0 0 8px 1px hsla(140, 100%, 45%, 0.3);
+}
+
+/* ====================================================================
+   5. Sprint Timeline Stage Progress Nodes
+   ==================================================================== */
+.timeline-container {
+  padding: 20px 24px;
+  overflow-x: auto;
+}
+.timeline-nodes {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 900px;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100px;
+  transition: transform var(--transition-normal);
+  position: relative;
+}
+.node-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  transition: all var(--transition-normal);
+}
+.node-label {
+  font-weight: 600;
+  font-size: 13px;
+  margin-top: 8px;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-normal);
+}
+.node-sub {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  margin-top: 2px;
+}
+
+.timeline-connector {
+  flex-grow: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 0 10px;
+  position: relative;
+  transition: background var(--transition-normal);
+}
+
+/* Node States: Active & Completed Sprints */
+.node.active .node-icon {
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 15px var(--color-cyan-glow);
+  transform: scale(1.15);
+}
+.node.active .node-label {
+  color: var(--color-cyan);
+  font-weight: 800;
+  text-shadow: 0 0 10px var(--color-cyan-glow);
+}
+.node.active {
+  animation: bobActive 2s infinite alternate ease-in-out;
+}
+@keyframes bobActive {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-4px); }
+}
+
+.node.completed .node-icon {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: var(--color-purple);
+  color: var(--color-purple);
+  box-shadow: 0 0 8px var(--color-purple-glow);
+}
+.node.completed .node-label {
+  color: var(--color-text-primary);
+}
+
+.timeline-connector.completed {
+  background: linear-gradient(90deg, var(--color-cyan), var(--color-purple));
+}
+
+/* ====================================================================
+   6. 3-Column Interactive Grid
+   ==================================================================== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr 340px;
+  gap: 24px;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.grid-col {
+  min-height: 500px;
+}
+
+.panel-card {
+  border-radius: 16px;
+  overflow: hidden;
+}
+.panel-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* Composer Composer box */
+.composer-composer textarea {
+  width: 100%;
+  height: 140px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  transition: border var(--transition-fast);
+}
+.composer-composer textarea:focus {
+  border-color: var(--color-cyan);
+}
+
+.glow-button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  margin-top: 12px;
+  box-shadow: 0 4px 15px -3px var(--color-cyan-glow);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.glow-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -2px var(--color-cyan-glow);
+}
+.glow-button:active {
+  transform: translateY(1px);
+}
+
+/* Metrics Dashboard Cards */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.metric-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.metric-label {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+}
+.metric-value {
+  font-size: 20px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+.color-green { color: var(--color-green); }
+
+/* SVG Latency Sparkline Graph */
+.chart-container {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+  height: 120px;
+}
+
+/* ====================================================================
+   7. Agent Terminal Console Pane (COLUMN 2)
+   ==================================================================== */
+.terminal-tab-bar {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.tab-btn {
+  flex: 1;
+  padding: 12px 8px;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border-bottom: 2px solid transparent;
+}
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text-primary);
+}
+.tab-btn.active {
+  color: var(--color-cyan);
+  border-bottom-color: var(--color-cyan);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.terminal-console {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  background: #04070D;
+  margin: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.window-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.window-dot.red { background-color: var(--color-red); }
+.window-dot.yellow { background-color: var(--color-yellow); }
+.window-dot.green { background-color: var(--color-green); }
+
+.terminal-title {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+.terminal-spinner {
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-cyan);
+  animation: terminalPulse 1s infinite alternate;
+}
+@keyframes terminalPulse {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 8px var(--color-cyan); }
+}
+
+.terminal-body {
+  padding: 16px;
+  flex-grow: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: #38BDF8; /* Cyber Light Blue terminal text */
+  overflow-y: auto;
+  max-height: 480px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ====================================================================
+   8. Workspace Files & Code Preview (COLUMN 3)
+   ==================================================================== */
+.workspace-tree {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  max-height: 150px;
+}
+
+.empty-state {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-dim);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+}
+.file-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+.file-item.active {
+  background: rgba(6, 182, 212, 0.1);
+  border-color: rgba(6, 182, 212, 0.2);
+  color: var(--color-cyan);
+}
+
+.file-name {
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-size {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-dim);
+}
+
+/* Code Viewer */
+.code-viewer-container {
+  background: #03060B;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  height: 280px;
+}
+
+.code-viewer-body {
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: #93C5FD;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  flex-grow: 1;
+}
