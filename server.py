@@ -1,5 +1,7 @@
 import os
 import json
+import subprocess
+import re
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,6 +65,164 @@ async def serve_js():
 # --------------------------------------------------------------------
 # REST API Endpoints
 # --------------------------------------------------------------------
+@app.get("/api/github/status")
+async def api_github_status():
+    """Checks the active git remote configuration and gh auth status."""
+    git_dir = os.path.join(WORKSPACE_DIR, ".git")
+    active_repo = "Not Configured"
+    
+    if os.path.exists(git_dir):
+        try:
+            res = subprocess.run(
+                "git remote get-url origin",
+                shell=True,
+                cwd=WORKSPACE_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            if res.returncode == 0 and res.stdout:
+                active_repo = res.stdout.strip()
+        except Exception:
+            pass
+            
+    # Check gh CLI authentication status
+    gh_user = "Unknown"
+    is_authenticated = False
+    try:
+        res = subprocess.run(
+            "env -u GITHUB_TOKEN gh auth status",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        # gh auth status outputs to stderr typically
+        output = res.stderr + "\n" + res.stdout
+        match = re.search(r"Logged in to github\.com account ([a-zA-Z0-9_-]+)", output)
+        if match:
+            gh_user = match.group(1)
+            is_authenticated = True
+    except Exception:
+        pass
+        
+    return {
+        "authenticated": is_authenticated,
+        "username": gh_user,
+        "active_repo": active_repo
+    }
+
+@app.post("/api/github/sync")
+async def api_github_sync(payload: dict):
+    """Clones an existing repository or creates a new one on GitHub."""
+    action = payload.get("action") # "create" or "connect"
+    repo_name = payload.get("repo_name")
+    
+    if not repo_name or not action:
+        raise HTTPException(status_code=400, detail="Missing 'action' or 'repo_name'")
+        
+    # Clean repo name from symbols
+    repo_name = re.sub(r"[^a-zA-Z0-9_-]", "", repo_name)
+    
+    # 1. Connect (Clone) Action
+    if action == "connect":
+        try:
+            # Safely recreate workspace directory
+            import shutil
+            if os.path.exists(WORKSPACE_DIR):
+                shutil.rmtree(WORKSPACE_DIR)
+            os.makedirs(WORKSPACE_DIR, exist_ok=True)
+            
+            # Fetch default username
+            status_res = await api_github_status()
+            username = status_res.get("username", "jacattac314")
+            
+            # Run git clone
+            clone_url = f"https://github.com/{username}/{repo_name}.git"
+            res = subprocess.run(
+                f"git clone {clone_url} .",
+                shell=True,
+                cwd=WORKSPACE_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            if res.returncode != 0:
+                raise Exception(res.stderr or "Clone failed")
+                
+            return {
+                "status": "success",
+                "message": f"Successfully cloned remote repository: {clone_url}"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to connect repository: {str(e)}"
+            }
+            
+    # 2. Create Action
+    elif action == "create":
+        try:
+            # Create repo on GitHub
+            res = subprocess.run(
+                f"env -u GITHUB_TOKEN gh repo create {repo_name} --public",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            if res.returncode != 0 and "already exists" not in (res.stderr + res.stdout):
+                raise Exception(res.stderr or "GitHub repository creation failed")
+                
+            # Initialize Git inside workspace
+            subprocess.run("git init", shell=True, cwd=WORKSPACE_DIR)
+            
+            # Fetch remote url
+            status_res = await api_github_status()
+            username = status_res.get("username", "jacattac314")
+            remote_url = f"https://github.com/{username}/{repo_name}.git"
+            
+            # Remove existing remote if it exists
+            subprocess.run("git remote remove origin", shell=True, cwd=WORKSPACE_DIR)
+            
+            # Add remote origin
+            subprocess.run(f"git remote add origin {remote_url}", shell=True, cwd=WORKSPACE_DIR)
+            
+            # Create a base README.md if workspace is empty
+            readme_path = os.path.join(WORKSPACE_DIR, "README.md")
+            if not os.listdir(WORKSPACE_DIR) or not os.path.exists(readme_path):
+                with open(readme_path, "w") as f:
+                    f.write(f"# {repo_name}\n\nAutomated workspace project created via local GStack Agent stack.\n")
+                    
+            # Stage, commit, and push initial commit
+            subprocess.run("git add .", shell=True, cwd=WORKSPACE_DIR)
+            subprocess.run('git commit -m "initial commit from local gstack agents"', shell=True, cwd=WORKSPACE_DIR)
+            subprocess.run("git branch -M main", shell=True, cwd=WORKSPACE_DIR)
+            
+            push_res = subprocess.run(
+                "env -u GITHUB_TOKEN git push -u origin main",
+                shell=True,
+                cwd=WORKSPACE_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            if push_res.returncode != 0:
+                raise Exception(push_res.stderr or "Initial git push failed")
+                
+            return {
+                "status": "success",
+                "message": f"Successfully created and synced remote repository: {remote_url}"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to create repository: {str(e)}"
+            }
+            
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
+
 @app.post("/api/sprint/start")
 async def api_sprint_start(payload: dict, background_tasks: BackgroundTasks):
     global active_sprint_task
@@ -135,6 +295,9 @@ async def api_workspace_files():
         output = []
         for file in files:
             p = os.path.join(WORKSPACE_DIR, file)
+            # Skip hidden files
+            if file.startswith("."):
+                continue
             size = os.path.getsize(p)
             output.append({"name": file, "size": size})
         return {"files": output}

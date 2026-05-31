@@ -1,48 +1,75 @@
-# Product Requirements Document
+# Product Requirements Document (PRD)
 
 ## Goal & Target Audience
-**Goal:** Launch a responsive, user‑friendly website that showcases the company’s products/services, provides essential information, and enables visitors to get in touch.  
-**Target Audience:** Small business owners, potential customers, and internal team members who need a professional online presence.
+**Goal:** Build a professional, responsive website that establishes an online presence for the business, showcases its products/services, and captures leads through a contact form.  
+
+**Target Audience:**
+- Prospective customers looking to learn about offerings.
+- Partners and investors seeking company information.
+- General public interested in brand credibility.
 
 ## User Stories
-1. **As a visitor**, I want a clear homepage with a hero section so I can quickly understand what the site offers.
-2. **As a visitor**, I want easy navigation to product/service pages so I can explore details.
-3. **As a visitor**, I want a contact form on the “Contact” page so I can reach out with inquiries.
-4. **As an admin**, I want a simple way to update text content (e.g., hero headline, about section) without code changes (out‑of‑scope for future enhancement).
-5. **As a mobile user**, I want the site to adapt seamlessly to different screen sizes so I can browse on any device.
+1. **As a visitor**, I want to see a clear headline and value proposition on the homepage so I instantly understand what the business does.
+2. **As a visitor**, I want an intuitive navigation menu to access the About, Services/Products, and Contact pages.
+3. **As a visitor**, I want the About page to provide concise information about the company’s mission, team, and history.
+4. **As a visitor**, I want a functional contact form (name, email, message) that validates input and confirms successful submission.
+5. **As a marketing manager**, I need basic SEO meta tags and Open Graph tags so the site is discoverable and shares correctly on social media.
+6. **As a developer**, I need a responsive design that works on desktop, tablet, and mobile browsers.
 
 ## Functional Specifications
 - **Home Page**
-  - Header with logo and navigation links (Home, About, Products, Contact).
-  - Hero section with headline, sub‑headline, and primary CTA button.
-  - Features/benefits grid with icons and short descriptions.
-  - Footer with quick links, social icons, and copyright notice.
+  - Hero section with headline, sub‑headline, and call‑to‑action button linking to the contact form.
+  - Brief feature highlights (3‑4 bullet points).
+  - Footer with navigation links and social media icons.
+  
 - **About Page**
-  - Section describing the company’s mission, values, and team (optional placeholder content).
-- **Products/Services Pages**
-  - List view displaying thumbnails, titles, and brief tags.
-  - Detail view with description, key features, and an “Inquire” button.
+  - Company mission statement.
+  - Short biography of key team members (photos optional).
+  - Timeline or milestones section.
+
+- **Services/Products Page** *(optional but recommended)*
+  - List of core offerings with brief descriptions and images.
+  - “Learn More” links to detailed pages (future scope).
+
 - **Contact Page**
-  - Form fields: Name, Email, Subject, Message.
+  - Contact form with fields: Name, Email, Message.
   - Client‑side validation (required fields, email format).
-  - Successful submission shows a thank‑you message; form resets.
+  - Success message displayed after submission.
+  - Form endpoint placeholder (`/api/contact`) – to be implemented by the Coder.
+
 - **Responsive Design**
-  - Layouts tested at breakpoints: 320 px (mobile), 768 px (tablet), 1440 px (desktop).
-- **SEO & Accessibility**
-  - Proper `<title>`, meta description, and Open Graph tags on each page.
-  - Alt text for images; semantic HTML structure; keyboard‑navigable components.
-- **Performance**
-  - Page load time ≤ 3 seconds on a standard broadband connection (measured via Lighthouse).
+  - Mobile‑first CSS grid/flex layout.
+  - Breakpoints at 768 px and 1024 px for tablet and desktop adjustments.
+
+- **Technical Stack**
+  - HTML5 semantic markup.
+  - CSS3 (Flexbox/Grid) for layout; optional CSS framework (e.g., Tailwind or Bootstrap) for speed.
+  - Vanilla JavaScript for form validation and smooth scrolling.
+  - Optional static site generator (e.g., Hugo, Next.js) – out of scope for MVP.
 
 ## Out-of-Scope Items
-- E‑commerce checkout or payment processing.
-- User authentication / account management.
-- Blog or news publishing platform.
-- Complex back‑end CMS; content updates will be manual via HTML edits for this MVP.
+- E‑commerce functionality (product catalog, cart, checkout).
+- User authentication / member accounts.
+- Full CMS for dynamic content editing.
+- Complex animations or custom graphics beyond basic icons.
+- Multi‑language support (i18n).
 
 ## Acceptance Criteria
-- All pages render correctly across the defined breakpoints without horizontal scrolling.
-- The contact form validates inputs and displays a confirmation message after submission (no actual email integration required for MVP).
-- SEO meta tags are present on every page and meet basic validation tools.
-- No JavaScript errors or console warnings when loading the site in Chrome, Firefox, Safari, and Edge.
-- Performance audit shows a score of at least 90/100 on Lighthouse for performance, accessibility, best practices, and SEO.
+1. **Home Page** renders correctly on all device widths; hero section displays headline and CTA.
+2. **Navigation** links smoothly to respective sections/pages without page reloads (single‑page feel).
+3. **About Page** contains mission statement, team bios, and a brief history.
+4. **Contact Form**:
+   - All fields are required; email must match standard format.
+   - On successful submission, a “Thank you” message appears and the form resets.
+   - Network request to `/api/contact` is made (no backend implementation required for MVP).
+5. **Responsive Layout**: No horizontal scrolling on screens ≥ 320 px; elements re‑flow gracefully up to 1920 px.
+6. **SEO Basics**:
+   - `<title>` and meta description present on each page.
+   - Open Graph tags (`og:title`, `og:description`, `og:image`) included for social sharing.
+7. **Performance**: Page load time under 2 seconds on a typical broadband connection (measured via Lighthouse).
+
+---
+
+*Document version:* 1.0  
+*Author:* CEO / Lead Product Manager  
+*Date:* 2025‑11‑03

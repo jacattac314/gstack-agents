@@ -35,6 +35,14 @@ const metricSavings = document.getElementById("metric-savings");
 
 const tabButtons = document.querySelectorAll(".tab-btn");
 
+// GitHub Elements
+const githubStatusDot = document.getElementById("github-status-dot");
+const githubStatusText = document.getElementById("github-status-text");
+const githubRepoName = document.getElementById("github-repo-name");
+const githubSyncAction = document.getElementById("github-sync-action");
+const githubSyncBtn = document.getElementById("github-sync-btn");
+const githubFeedback = document.getElementById("github-feedback");
+
 // --------------------------------------------------------------------
 // 1. Initial Handshake & Setup
 // --------------------------------------------------------------------
@@ -51,6 +59,10 @@ async function initializeDashboard() {
   
   setupEventListeners();
   startPollers();
+  
+  // Initial loads
+  fetchGitHubStatus();
+  fetchWorkspaceFiles();
 }
 
 // --------------------------------------------------------------------
@@ -70,6 +82,9 @@ function setupEventListeners() {
 
   // Launch Sprint Button
   sprintStartBtn.addEventListener("click", launchSprint);
+
+  // GitHub Sync Button
+  githubSyncBtn.addEventListener("click", syncGitHubProject);
 }
 
 // --------------------------------------------------------------------
@@ -112,7 +127,82 @@ async function launchSprint() {
 }
 
 // --------------------------------------------------------------------
-// 4. Background Data Pollers
+// 4. GitHub Project Sync Action
+// --------------------------------------------------------------------
+async function syncGitHubProject() {
+  const repoName = githubRepoName.value.trim();
+  const action = githubSyncAction.value;
+
+  if (!repoName) {
+    githubFeedback.textContent = "Error: Please enter a repository name!";
+    githubFeedback.style.color = "var(--color-red)";
+    return;
+  }
+
+  githubSyncBtn.disabled = true;
+  githubSyncBtn.textContent = "Syncing... ⚡";
+  githubFeedback.textContent = "Communicating with GitHub API gateway...";
+  githubFeedback.style.color = "var(--color-yellow)";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/github/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, repo_name: repoName })
+    });
+    const data = await res.json();
+
+    if (data.status === "success") {
+      githubFeedback.textContent = data.message;
+      githubFeedback.style.color = "var(--color-green)";
+      
+      // Auto-populate composer prompt suggestion
+      if (action === "connect") {
+        composerTextarea.placeholder = `Connected to remote repo. Suggest goals like: 'Inspect the files and fix any bugs in README.md' or 'Add a unit test script'`;
+      }
+      
+      // Immediately refresh workspace files tree
+      fetchWorkspaceFiles();
+      fetchGitHubStatus();
+    } else {
+      githubFeedback.textContent = `Sync failed: ${data.message}`;
+      githubFeedback.style.color = "var(--color-red)";
+    }
+  } catch (e) {
+    githubFeedback.textContent = `Network failure: ${e}`;
+    githubFeedback.style.color = "var(--color-red)";
+  } finally {
+    githubSyncBtn.disabled = false;
+    githubSyncBtn.textContent = "Sync GitHub Project ⚡";
+  }
+}
+
+async function fetchGitHubStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/api/github/status`);
+    const data = await res.json();
+    
+    if (data && data.authenticated) {
+      githubStatusDot.className = "status-dot green";
+      githubStatusText.textContent = `@${data.username} (Connected)`;
+      
+      if (data.active_repo && data.active_repo !== "Not Configured") {
+        const repoNameOnly = data.active_repo.split("/").pop().replace(".git", "");
+        githubRepoName.value = repoNameOnly;
+        githubStatusText.textContent = `@${data.username} (${repoNameOnly})`;
+      }
+    } else {
+      githubStatusDot.className = "status-dot red";
+      githubStatusText.textContent = "Disconnected (Run: gh auth login)";
+    }
+  } catch (e) {
+    githubStatusDot.className = "status-dot red";
+    githubStatusText.textContent = "FastAPI Offline";
+  }
+}
+
+// --------------------------------------------------------------------
+// 5. Background Data Pollers
 // --------------------------------------------------------------------
 function startPollers() {
   // Poll overall sprint status
@@ -121,6 +211,8 @@ function startPollers() {
   pollers.push(setInterval(fetchAgentLog, 1000));
   // Poll workspace files tree
   pollers.push(setInterval(fetchWorkspaceFiles, 2000));
+  // Poll GitHub authentication status
+  pollers.push(setInterval(fetchGitHubStatus, 5000));
 }
 
 async function fetchSprintStatus() {
@@ -160,7 +252,7 @@ async function fetchWorkspaceFiles() {
 }
 
 // --------------------------------------------------------------------
-// 5. Dynamic UI Updates (Timeline Nodes, Metrics, Sparkline)
+// 6. Dynamic UI Updates (Timeline Nodes, Metrics, Sparkline)
 // --------------------------------------------------------------------
 function updateUIState() {
   // 1. Update Metrics
@@ -265,7 +357,7 @@ async function inspectFile(filename) {
 window.inspectFile = inspectFile;
 
 // --------------------------------------------------------------------
-// 6. SVG Latency Chart Sparkline Render
+// 7. SVG Latency Chart Sparkline Render
 // --------------------------------------------------------------------
 function renderLatencyChart(history) {
   const svgPlaceholder = document.getElementById("chart-placeholder");

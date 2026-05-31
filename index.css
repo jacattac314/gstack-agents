@@ -560,3 +560,70 @@ body {
   word-break: break-all;
   flex-grow: 1;
 }
+
+/* ====================================================================
+   9. Upgraded GitHub Project Synchronization Classes
+   ==================================================================== */
+.github-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.premium-input, .premium-select {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  outline: none;
+  transition: border var(--transition-fast);
+}
+.premium-input:focus, .premium-select:focus {
+  border-color: var(--color-cyan);
+}
+
+.premium-select option {
+  background-color: var(--bg-main);
+  color: var(--color-text-primary);
+}
+
+.glow-button.secondary {
+  background: linear-gradient(135deg, var(--color-purple), #D946EF);
+  box-shadow: 0 4px 15px -3px rgba(168, 85, 247, 0.25);
+  margin-top: 8px;
+}
+.glow-button.secondary:hover {
+  box-shadow: 0 6px 20px -2px rgba(168, 85, 247, 0.3);
+}
+
+.sync-feedback {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-cyan);
+  min-height: 14px;
+}
+.gap-sm {
+  gap: 8px;
+}
+.github-status-row .status-dot.green {
+  background-color: var(--color-green);
+  box-shadow: 0 0 8px var(--color-green);
+}
+.github-status-row .status-dot.red {
+  background-color: var(--color-red);
+  box-shadow: 0 0 8px var(--color-red);
+}
+.github-status-row .status-dot.yellow {
+  background-color: var(--color-yellow);
+  box-shadow: 0 0 8px var(--color-yellow);
+}

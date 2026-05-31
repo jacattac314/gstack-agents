@@ -96,6 +96,30 @@
       <!-- COLUMN 1: Control Center & Telemetry -->
       <aside class="grid-col flex-col gap-md">
         
+        <!-- GitHub Sync Panel -->
+        <div class="glass-card panel-card padding-lg">
+          <h2 class="panel-title">GitHub Project Sync</h2>
+          <p class="panel-desc">Clone an existing GitHub repository to build inside, or create a brand new repo dynamically.</p>
+          <div class="github-sync-panel margin-top-md">
+            <div class="github-status-row">
+              <span class="status-dot red" id="github-status-dot"></span>
+              <span class="status-text" id="github-status-text">Checking credentials...</span>
+            </div>
+            
+            <div class="margin-top-sm flex-col gap-sm">
+              <input type="text" id="github-repo-name" class="premium-input" placeholder="Repository Name (e.g. neon-timer)">
+              
+              <select id="github-sync-action" class="premium-select">
+                <option value="connect">🔗 Connect to Existing (Clone)</option>
+                <option value="create">🆕 Create New GitHub Repo</option>
+              </select>
+              
+              <button id="github-sync-btn" class="glow-button secondary">Sync GitHub Project ⚡</button>
+            </div>
+            <div id="github-feedback" class="sync-feedback margin-top-sm"></div>
+          </div>
+        </div>
+
         <!-- Sprint Composer -->
         <div class="glass-card panel-card padding-lg">
           <h2 class="panel-title">Sprint Composer</h2>
