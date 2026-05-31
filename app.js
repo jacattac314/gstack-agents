@@ -25,6 +25,7 @@ let lastObservedPhase = null;
 const activeModelEl = document.getElementById("active-model-id");
 const composerTextarea = document.getElementById("composer-textarea");
 const sprintActionBtn = document.getElementById("sprint-action-btn");
+const sprintLaunchAppBtn = document.getElementById("sprint-launch-app-btn");
 const drawerToggleBtn = document.getElementById("drawer-toggle-btn");
 const gridContainer = document.querySelector(".dashboard-grid");
 const pipelineNodes = document.querySelectorAll(".timeline-nodes .node");
@@ -172,6 +173,11 @@ function setupEventListeners() {
 
   // Sprint Toggle Action Button (Launch/Stop)
   sprintActionBtn.addEventListener("click", handleSprintAction);
+
+  // Launch App Button
+  sprintLaunchAppBtn.addEventListener("click", () => {
+    window.open("/workspace/app/index.html", "_blank");
+  });
 
   // GitHub Sync Button
   githubSyncBtn.addEventListener("click", syncGitHubProject);
@@ -479,6 +485,13 @@ function updateUIState() {
       sprintActionBtn.textContent = "Stop Sprint 🛑";
     }
     terminalPulse.style.display = "block";
+  }
+
+  // Toggle Launch App Button visibility based on phase completion
+  if (state.current_phase === "completed") {
+    sprintLaunchAppBtn.style.display = "block";
+  } else {
+    sprintLaunchAppBtn.style.display = "none";
   }
 
   // Auto-follow: if the current phase changed, automatically focus terminal on the new active agent

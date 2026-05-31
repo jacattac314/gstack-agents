@@ -4,6 +4,7 @@ import subprocess
 import re
 import shutil
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -23,6 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Workspace directory as static files under /workspace/app
+app.mount("/workspace/app", StaticFiles(directory=WORKSPACE_DIR), name="workspace_app")
 
 # State variable for active background task
 active_sprint_task = None
