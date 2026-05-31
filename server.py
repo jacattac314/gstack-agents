@@ -209,6 +209,41 @@ async def api_github_login(payload: dict):
         }
 
 
+@app.get("/api/github/repos")
+async def api_github_repos():
+    """Fetches the list of repositories for the authenticated user from GitHub API."""
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise HTTPException(status_code=401, detail="Please authenticate with a GitHub PAT first")
+        
+    import urllib.request
+    import urllib.error
+    import json
+    
+    req = urllib.request.Request(
+        "https://api.github.com/user/repos?per_page=100&sort=updated",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "GStack-Agent-Console"
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as response:
+            if response.status == 200:
+                repos_data = json.loads(response.read().decode())
+                output = []
+                for r in repos_data:
+                    output.append({
+                        "name": r.get("name"),
+                        "full_name": r.get("full_name"),
+                        "private": r.get("private")
+                    })
+                return {"repos": output}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch repositories from GitHub: {str(e)}")
+
+
 @app.post("/api/github/sync")
 async def api_github_sync(payload: dict):
     """Clones an existing repository or creates a new one on GitHub using authenticated token."""

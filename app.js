@@ -39,6 +39,7 @@ const tabButtons = document.querySelectorAll(".tab-btn");
 const githubStatusDot = document.getElementById("github-status-dot");
 const githubStatusText = document.getElementById("github-status-text");
 const githubRepoName = document.getElementById("github-repo-name");
+const githubRepoSelect = document.getElementById("github-repo-select");
 const githubSyncAction = document.getElementById("github-sync-action");
 const githubSyncBtn = document.getElementById("github-sync-btn");
 const githubFeedback = document.getElementById("github-feedback");
@@ -72,8 +73,55 @@ async function initializeDashboard() {
 }
 
 // --------------------------------------------------------------------
-// 2. Tab Bar & Action Event Listeners
+// 2. Tab Bar & Action Event Listeners & Repositories Fetcher
 // --------------------------------------------------------------------
+let fetchedRepos = [];
+
+async function fetchUserRepositories() {
+  try {
+    const res = await fetch(`${API_BASE}/api/github/repos?_=${Date.now()}`);
+    const data = await res.json();
+    if (data && data.repos) {
+      fetchedRepos = data.repos;
+      populateRepoDropdown();
+    }
+  } catch (e) {
+    console.error("Failed to fetch user repositories:", e);
+  }
+}
+
+function populateRepoDropdown() {
+  const currentVal = githubRepoSelect.value;
+  
+  if (fetchedRepos.length === 0) {
+    githubRepoSelect.innerHTML = `<option value="">No repositories found</option>`;
+    return;
+  }
+  
+  let html = fetchedRepos.map(repo => {
+    const isPrivate = repo.private ? "🔒" : "🌐";
+    return `<option value="${repo.name}">${isPrivate} ${repo.full_name}</option>`;
+  }).join("");
+  
+  githubRepoSelect.innerHTML = html;
+  
+  // Try to preserve selection if possible, otherwise default to first
+  if (currentVal && fetchedRepos.some(r => r.name === currentVal)) {
+    githubRepoSelect.value = currentVal;
+  }
+}
+
+function toggleSyncActionFields() {
+  const action = githubSyncAction.value;
+  if (action === "connect") {
+    githubRepoSelect.style.display = "block";
+    githubRepoName.style.display = "none";
+  } else {
+    githubRepoSelect.style.display = "none";
+    githubRepoName.style.display = "block";
+  }
+}
+
 function setupEventListeners() {
   // Tab Bar Switching
   tabButtons.forEach(btn => {
@@ -94,6 +142,9 @@ function setupEventListeners() {
 
   // GitHub Login Button
   githubLoginBtn.addEventListener("click", loginGitHub);
+
+  // Toggle sync fields based on action dropdown
+  githubSyncAction.addEventListener("change", toggleSyncActionFields);
 }
 
 // --------------------------------------------------------------------
@@ -180,11 +231,17 @@ async function loginGitHub() {
 }
 
 async function syncGitHubProject() {
-  const repoName = githubRepoName.value.trim();
   const action = githubSyncAction.value;
+  let repoName = "";
+  
+  if (action === "connect") {
+    repoName = githubRepoSelect.value;
+  } else {
+    repoName = githubRepoName.value.trim();
+  }
 
   if (!repoName) {
-    githubFeedback.textContent = "Error: Please enter a repository name!";
+    githubFeedback.textContent = "Error: Please select or enter a repository name!";
     githubFeedback.style.color = "var(--color-red)";
     return;
   }
@@ -209,6 +266,9 @@ async function syncGitHubProject() {
       if (action === "connect") {
         composerTextarea.placeholder = `Connected to remote repo. Suggest goals like: 'Inspect the files and fix any bugs in README.md' or 'Add a unit test script'`;
       }
+      
+      // Reset fetched repos list to force reload new repo addition on next status check
+      fetchedRepos = [];
       
       // Immediately refresh workspace files tree
       fetchWorkspaceFiles();
@@ -240,9 +300,20 @@ async function fetchGitHubStatus() {
       githubSyncSection.style.display = "flex";
       githubDivider.style.display = "block";
       
+      // Fetch repositories once authenticated
+      if (fetchedRepos.length === 0) {
+        fetchUserRepositories();
+      }
+      
+      toggleSyncActionFields();
+      
       if (data.active_repo && data.active_repo !== "Not Configured") {
         const repoNameOnly = data.active_repo.split("/").pop().replace(".git", "");
-        githubRepoName.value = repoNameOnly;
+        if (githubSyncAction.value === "connect") {
+          githubRepoSelect.value = repoNameOnly;
+        } else {
+          githubRepoName.value = repoNameOnly;
+        }
         githubStatusText.textContent = `@${data.username} (${repoNameOnly})`;
       }
     } else {
