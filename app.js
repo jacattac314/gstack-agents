@@ -18,6 +18,7 @@ let state = {
 let activeAgent = "ceo";
 let activeFile = null;
 let pollers = [];
+let isInitialLoad = true;
 
 // DOM Elements
 const activeModelEl = document.getElementById("active-model-id");
@@ -318,10 +319,13 @@ async function fetchGitHubStatus() {
       
       if (data.active_repo && data.active_repo !== "Not Configured") {
         const repoNameOnly = data.active_repo.split("/").pop().replace(".git", "");
-        if (githubSyncAction.value === "connect") {
-          githubRepoSelect.value = repoNameOnly;
-        } else {
-          githubRepoName.value = repoNameOnly;
+        if (isInitialLoad) {
+          if (githubSyncAction.value === "connect") {
+            githubRepoSelect.value = repoNameOnly;
+          } else {
+            githubRepoName.value = repoNameOnly;
+          }
+          isInitialLoad = false;
         }
         githubStatusText.textContent = `@${data.username} (${repoNameOnly})`;
       }
