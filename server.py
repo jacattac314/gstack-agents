@@ -398,6 +398,18 @@ async def api_sprint_start(payload: dict, background_tasks: BackgroundTasks):
     background_tasks.add_task(run_sprint_background, goal)
     return {"status": "success", "message": "GStack sprint triggered successfully in background."}
 
+@app.post("/api/sprint/stop")
+async def api_sprint_stop():
+    global active_sprint_task
+    if active_sprint_task is None:
+        return {"status": "error", "message": "No active sprint is running."}
+    
+    try:
+        active_sprint_task.cancel()
+        return {"status": "success", "message": "Sprint cancellation requested successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel sprint: {e}")
+
 @app.get("/api/sprint/status")
 async def api_sprint_status():
     state_file = os.path.join(LOGS_DIR, "sprint_state.json")

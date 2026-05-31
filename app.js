@@ -24,6 +24,7 @@ let isInitialLoad = true;
 const activeModelEl = document.getElementById("active-model-id");
 const composerTextarea = document.getElementById("composer-textarea");
 const sprintStartBtn = document.getElementById("sprint-start-btn");
+const sprintStopBtn = document.getElementById("sprint-stop-btn");
 const terminalOutput = document.getElementById("terminal-output");
 const terminalName = document.getElementById("terminal-name");
 const terminalPulse = document.getElementById("terminal-pulse");
@@ -160,6 +161,9 @@ function setupEventListeners() {
   // Launch Sprint Button
   sprintStartBtn.addEventListener("click", launchSprint);
 
+  // Stop Sprint Button
+  sprintStopBtn.addEventListener("click", stopSprint);
+
   // GitHub Sync Button
   githubSyncBtn.addEventListener("click", syncGitHubProject);
 
@@ -182,6 +186,28 @@ async function launchSprint() {
     alert("Please enter a software sprint goal!");
     return;
   }
+
+  // Clear progress bar and reset state immediately
+  state = {
+    goal: goalText,
+    current_phase: "idle",
+    phases: {
+      think: {status: "pending", agent: "ceo", summary: ""},
+      plan: {status: "pending", agent: "eng_manager", summary: ""},
+      design: {status: "pending", agent: "designer", summary: ""},
+      build: {status: "pending", agent: "coder", summary: ""},
+      review: {status: "pending", agent: "release_engineer", summary: ""},
+      test: {status: "pending", agent: "qa_lead", summary: ""},
+      ship: {status: "pending", agent: "release_engineer", summary: ""}
+    },
+    metrics: {
+      active_model: state.metrics?.active_model || "nvidia/nemotron-3-nano-omni",
+      total_runs: state.metrics?.total_runs || 0,
+      accumulated_savings: state.metrics?.accumulated_savings || 0.0,
+      latency_history: state.metrics?.latency_history || []
+    }
+  };
+  updateUIState();
 
   sprintStartBtn.disabled = true;
   sprintStartBtn.textContent = "Orchestrating... ⚡";
@@ -428,15 +454,19 @@ function updateUIState() {
     activeModelEl.textContent = state.metrics.active_model.split("/").pop();
   }
 
-  // 2. Sprint Start button state
-  if (state.current_phase === "idle" || state.current_phase === "completed") {
+  // 2. Sprint Start & Stop button state
+  if (state.current_phase === "idle" || state.current_phase === "completed" || state.current_phase === "cancelled") {
     sprintStartBtn.disabled = false;
     sprintStartBtn.textContent = "Launch Sprint ⚡";
     terminalPulse.style.display = "none";
+    sprintStopBtn.style.display = "none";
+    sprintStopBtn.disabled = false;
+    sprintStopBtn.textContent = "Stop Sprint 🛑";
   } else {
     sprintStartBtn.disabled = true;
     sprintStartBtn.textContent = "Sprint Running... ⚡";
     terminalPulse.style.display = "block";
+    sprintStopBtn.style.display = "block";
   }
 
   // 3. Update Timeline Stages Nodes
@@ -450,13 +480,23 @@ function updateUIState() {
     if (!nodeEl) return;
 
     // Reset styles
-    nodeEl.classList.remove("active", "completed");
+    nodeEl.classList.remove("active", "completed", "cancelled");
 
     // Connectors mapping
     const connector = nodeEl.nextElementSibling;
 
-    if (state.current_phase === phase) {
+    if (state.phases[phase] && state.phases[phase].status === "cancelled") {
+      nodeEl.classList.add("cancelled");
+      if (connector && connector.classList.contains("timeline-connector")) {
+        connector.classList.remove("completed");
+      }
+    } else if (state.current_phase === phase) {
       nodeEl.classList.add("active");
+    } else if (state.phases[phase] && state.phases[phase].status === "completed") {
+      nodeEl.classList.add("completed");
+      if (connector && connector.classList.contains("timeline-connector")) {
+        connector.classList.add("completed");
+      }
     } else if (idx < currentIdx && currentIdx !== -1) {
       nodeEl.classList.add("completed");
       if (connector && connector.classList.contains("timeline-connector")) {
@@ -563,6 +603,34 @@ function renderLatencyChart(history) {
   // Build enclosed SVG Area Path string
   let dArea = `${d} L ${points[points.length - 1].x} ${chartHeight - padding} L ${points[0].x} ${chartHeight - padding} Z`;
   areaEl.setAttribute("d", dArea);
+}
+
+async function stopSprint() {
+  if (!confirm("Are you sure you want to stop the current sprint?")) {
+    return;
+  }
+  
+  sprintStopBtn.disabled = true;
+  sprintStopBtn.textContent = "Stopping... 🛑";
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/sprint/stop?_=${Date.now()}`, {
+      method: "POST"
+    });
+    const data = await res.json();
+    
+    if (data.status === "success") {
+      terminalOutput.textContent += `\n🛑 Sprint cancellation requested successfully!\n`;
+    } else {
+      alert(`Error stopping sprint: ${data.message}`);
+      sprintStopBtn.disabled = false;
+      sprintStopBtn.textContent = "Stop Sprint 🛑";
+    }
+  } catch (e) {
+    alert(`Failed to contact FastAPI server: ${e}`);
+    sprintStopBtn.disabled = false;
+    sprintStopBtn.textContent = "Stop Sprint 🛑";
+  }
 }
 
 // Launch initialization

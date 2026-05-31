@@ -139,7 +139,10 @@
           <p class="panel-desc">Submit a high-level software objective and watch your local agent sprint team execute it stage by stage.</p>
           <div class="composer-composer margin-top-md">
             <textarea id="composer-textarea" placeholder="e.g. Create a single-page index.html file with a gorgeous neon countdown timer for a product launch page. Include high-end hover effects and animations..."></textarea>
-            <button id="sprint-start-btn" class="glow-button">Launch Sprint ⚡</button>
+            <div class="button-group flex-col gap-sm margin-top-md">
+              <button id="sprint-start-btn" class="glow-button" style="margin-top:0;">Launch Sprint ⚡</button>
+              <button id="sprint-stop-btn" class="glow-button red" style="margin-top:0; display:none;">Stop Sprint 🛑</button>
+            </div>
           </div>
         </div>
 

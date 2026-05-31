@@ -265,6 +265,7 @@ async def execute_agent_with_tools(role_name: str, system_prompt: str, user_prom
 class GStackSprintOrchestrator:
     def __init__(self, sprint_goal: str):
         self.sprint_goal = sprint_goal
+        self.is_cancelled = False
         self.state_file_path = os.path.join(LOGS_DIR, "sprint_state.json")
         self.state = {
             "goal": sprint_goal,
@@ -301,6 +302,15 @@ class GStackSprintOrchestrator:
         with open(self.state_file_path, "w") as f:
             json.dump(self.state, f, indent=2)
 
+    def cancel(self):
+        """Cancels the active sprint loop and updates phase state metrics."""
+        self.is_cancelled = True
+        self.state["current_phase"] = "cancelled"
+        for phase in self.state["phases"]:
+            if self.state["phases"][phase]["status"] in ["running", "pending"]:
+                self.state["phases"][phase]["status"] = "cancelled"
+        self.save_state()
+
     async def run_sprint(self):
         """Runs the entire GStack staged workflow."""
         import time
@@ -317,6 +327,8 @@ class GStackSprintOrchestrator:
         # --------------------------------------------------
         # Phase 1: Think (CEO)
         # --------------------------------------------------
+        if self.is_cancelled:
+            return
         print("\n[Phase 1] Starting Think (CEO)...")
         t0 = time.time()
         self.state["current_phase"] = "think"
@@ -326,6 +338,9 @@ class GStackSprintOrchestrator:
         ceo_system = load_skill_prompt("ceo")
         ceo_summary = await execute_agent_with_tools("ceo", ceo_system, self.sprint_goal)
         
+        if self.is_cancelled:
+            return
+            
         t1 = time.time()
         self.state["phases"]["think"]["status"] = "completed"
         self.state["phases"]["think"]["summary"] = ceo_summary
@@ -336,6 +351,8 @@ class GStackSprintOrchestrator:
         # --------------------------------------------------
         # Phase 2: Plan (Engineering Manager)
         # --------------------------------------------------
+        if self.is_cancelled:
+            return
         print("\n[Phase 2] Starting Plan (Engineering Manager)...")
         t0 = time.time()
         self.state["current_phase"] = "plan"
@@ -345,6 +362,9 @@ class GStackSprintOrchestrator:
         em_system = load_skill_prompt("eng_manager")
         em_summary = await execute_agent_with_tools("eng_manager", em_system, f"Sprint Goal: {self.sprint_goal}\n\nCEO PRD:\n{ceo_summary}")
         
+        if self.is_cancelled:
+            return
+            
         t1 = time.time()
         self.state["phases"]["plan"]["status"] = "completed"
         self.state["phases"]["plan"]["summary"] = em_summary
@@ -355,6 +375,8 @@ class GStackSprintOrchestrator:
         # --------------------------------------------------
         # Phase 3: Design (Designer)
         # --------------------------------------------------
+        if self.is_cancelled:
+            return
         print("\n[Phase 3] Starting Design (Designer)...")
         t0 = time.time()
         self.state["current_phase"] = "design"
@@ -364,6 +386,9 @@ class GStackSprintOrchestrator:
         designer_system = load_skill_prompt("designer")
         designer_summary = await execute_agent_with_tools("designer", designer_system, f"Sprint Goal: {self.sprint_goal}\n\nTech Spec Plan:\n{em_summary}")
         
+        if self.is_cancelled:
+            return
+            
         t1 = time.time()
         self.state["phases"]["design"]["status"] = "completed"
         self.state["phases"]["design"]["summary"] = designer_summary
@@ -374,6 +399,8 @@ class GStackSprintOrchestrator:
         # --------------------------------------------------
         # Phase 4: Build (Coder)
         # --------------------------------------------------
+        if self.is_cancelled:
+            return
         print("\n[Phase 4] Starting Build (Coder)...")
         t0 = time.time()
         self.state["current_phase"] = "build"
@@ -383,6 +410,9 @@ class GStackSprintOrchestrator:
         coder_system = load_skill_prompt("coder")
         coder_summary = await execute_agent_with_tools("coder", coder_system, f"Sprint Goal: {self.sprint_goal}\n\nTech Specs:\n{em_summary}\n\nDesign Styles:\n{designer_summary}")
         
+        if self.is_cancelled:
+            return
+            
         t1 = time.time()
         self.state["phases"]["build"]["status"] = "completed"
         self.state["phases"]["build"]["summary"] = coder_summary
@@ -393,6 +423,8 @@ class GStackSprintOrchestrator:
         # --------------------------------------------------
         # Phase 5: Review (Release Engineer)
         # --------------------------------------------------
+        if self.is_cancelled:
+            return
         print("\n[Phase 5] Starting Review (Release Engineer)...")
         t0 = time.time()
         self.state["current_phase"] = "review"
@@ -402,6 +434,9 @@ class GStackSprintOrchestrator:
         re_system = load_skill_prompt("release_engineer")
         re_summary = await execute_agent_with_tools("release_engineer", re_system, f"Sprint Goal: {self.sprint_goal}\n\nCoder Output:\n{coder_summary}")
         
+        if self.is_cancelled:
+            return
+            
         t1 = time.time()
         self.state["phases"]["review"]["status"] = "completed"
         self.state["phases"]["review"]["summary"] = re_summary
@@ -412,6 +447,8 @@ class GStackSprintOrchestrator:
         # --------------------------------------------------
         # Phase 6: Test (QA Lead)
         # --------------------------------------------------
+        if self.is_cancelled:
+            return
         print("\n[Phase 6] Starting Test (QA Lead)...")
         t0 = time.time()
         self.state["current_phase"] = "test"
@@ -421,6 +458,9 @@ class GStackSprintOrchestrator:
         qa_system = load_skill_prompt("qa_lead")
         qa_summary = await execute_agent_with_tools("qa_lead", qa_system, f"Sprint Goal: {self.sprint_goal}\n\nCoder Output:\n{coder_summary}")
         
+        if self.is_cancelled:
+            return
+            
         t1 = time.time()
         self.state["phases"]["test"]["status"] = "completed"
         self.state["phases"]["test"]["summary"] = qa_summary
@@ -431,6 +471,8 @@ class GStackSprintOrchestrator:
         # --------------------------------------------------
         # Phase 7: Ship (Release Engineer)
         # --------------------------------------------------
+        if self.is_cancelled:
+            return
         print("\n[Phase 7] Starting Ship (Release Engineer)...")
         t0 = time.time()
         self.state["current_phase"] = "ship"
@@ -439,6 +481,9 @@ class GStackSprintOrchestrator:
         
         ship_summary = await execute_agent_with_tools("release_engineer", re_system, f"Sprint Goal: {self.sprint_goal}\n\nReview Notes:\n{re_summary}\n\nQA Test Notes:\n{qa_summary}\n\nEverything is approved. Build is verified. Compile the final release notes and ship the project.")
         
+        if self.is_cancelled:
+            return
+            
         t1 = time.time()
         self.state["phases"]["ship"]["status"] = "completed"
         self.state["phases"]["ship"]["summary"] = ship_summary

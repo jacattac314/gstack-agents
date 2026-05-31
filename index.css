@@ -278,6 +278,16 @@ body {
   background: linear-gradient(90deg, var(--color-cyan), var(--color-purple));
 }
 
+.node.cancelled .node-icon {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--color-red);
+  color: var(--color-red);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.25);
+}
+.node.cancelled .node-label {
+  color: var(--color-red);
+}
+
 /* ====================================================================
    6. 3-Column Interactive Grid
    ==================================================================== */
@@ -356,6 +366,13 @@ body {
 }
 .glow-button:active {
   transform: translateY(1px);
+}
+.glow-button.red {
+  background: linear-gradient(135deg, var(--color-red), #F43F5E);
+  box-shadow: 0 4px 15px -3px rgba(239, 68, 68, 0.25);
+}
+.glow-button.red:hover {
+  box-shadow: 0 6px 20px -2px rgba(239, 68, 68, 0.35);
 }
 
 /* Metrics Dashboard Cards */
