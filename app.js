@@ -41,6 +41,7 @@ const githubStatusDot = document.getElementById("github-status-dot");
 const githubStatusText = document.getElementById("github-status-text");
 const githubRepoName = document.getElementById("github-repo-name");
 const githubRepoSelect = document.getElementById("github-repo-select");
+const githubRepoSearch = document.getElementById("github-repo-search");
 const githubRepoDesc = document.getElementById("github-repo-desc");
 const githubSyncAction = document.getElementById("github-sync-action");
 const githubSyncBtn = document.getElementById("github-sync-btn");
@@ -92,15 +93,16 @@ async function fetchUserRepositories() {
   }
 }
 
-function populateRepoDropdown() {
+function populateRepoDropdown(filteredList = null) {
   const currentVal = githubRepoSelect.value;
+  const listToUse = filteredList !== null ? filteredList : fetchedRepos;
   
-  if (fetchedRepos.length === 0) {
-    githubRepoSelect.innerHTML = `<option value="">No repositories found</option>`;
+  if (listToUse.length === 0) {
+    githubRepoSelect.innerHTML = `<option value="">No matching repositories</option>`;
     return;
   }
   
-  let html = fetchedRepos.map(repo => {
+  let html = listToUse.map(repo => {
     const isPrivate = repo.private ? "🔒" : "🌐";
     return `<option value="${repo.name}">${isPrivate} ${repo.full_name}</option>`;
   }).join("");
@@ -108,18 +110,35 @@ function populateRepoDropdown() {
   githubRepoSelect.innerHTML = html;
   
   // Try to preserve selection if possible, otherwise default to first
-  if (currentVal && fetchedRepos.some(r => r.name === currentVal)) {
+  if (currentVal && listToUse.some(r => r.name === currentVal)) {
     githubRepoSelect.value = currentVal;
   }
+}
+
+function filterUserRepositories() {
+  const query = githubRepoSearch.value.trim().toLowerCase();
+  if (!query) {
+    populateRepoDropdown();
+    return;
+  }
+  
+  const filtered = fetchedRepos.filter(repo => {
+    return repo.name.toLowerCase().includes(query) || 
+           repo.full_name.toLowerCase().includes(query);
+  });
+  
+  populateRepoDropdown(filtered);
 }
 
 function toggleSyncActionFields() {
   const action = githubSyncAction.value;
   if (action === "connect") {
+    githubRepoSearch.style.display = "block";
     githubRepoSelect.style.display = "block";
     githubRepoName.style.display = "none";
     githubRepoDesc.style.display = "none";
   } else {
+    githubRepoSearch.style.display = "none";
     githubRepoSelect.style.display = "none";
     githubRepoName.style.display = "block";
     githubRepoDesc.style.display = "block";
@@ -149,6 +168,9 @@ function setupEventListeners() {
 
   // Toggle sync fields based on action dropdown
   githubSyncAction.addEventListener("change", toggleSyncActionFields);
+
+  // Handle typing inside the repository search bar for smart filtering
+  githubRepoSearch.addEventListener("input", filterUserRepositories);
 }
 
 // --------------------------------------------------------------------
