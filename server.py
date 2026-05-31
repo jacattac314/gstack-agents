@@ -402,6 +402,27 @@ async def api_sprint_start(payload: dict, background_tasks: BackgroundTasks):
 async def api_sprint_stop():
     global active_sprint_task
     if active_sprint_task is None:
+        # Self-healing: If no active python task object exists, check if the state file indicates a running sprint
+        state_file = os.path.join(LOGS_DIR, "sprint_state.json")
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, "r") as f:
+                    state_data = json.load(f)
+                
+                # If it's indeed running, force-cancel the state file directly to recover gracefully
+                if state_data.get("current_phase") not in ["idle", "completed", "cancelled"]:
+                    state_data["current_phase"] = "cancelled"
+                    for phase in state_data.get("phases", {}):
+                        if state_data["phases"][phase].get("status") in ["running", "pending"]:
+                            state_data["phases"][phase]["status"] = "cancelled"
+                    
+                    with open(state_file, "w") as f:
+                        json.dump(state_data, f, indent=2)
+                        
+                    return {"status": "success", "message": "No running thread detected. Force-cancelled sprint state successfully."}
+            except Exception as e:
+                print(f"Failed to self-heal/force-cancel sprint state: {e}")
+                
         return {"status": "error", "message": "No active sprint is running."}
     
     try:
