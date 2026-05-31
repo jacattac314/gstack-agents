@@ -19,12 +19,15 @@ let activeAgent = "ceo";
 let activeFile = null;
 let pollers = [];
 let isInitialLoad = true;
+let lastObservedPhase = null;
 
 // DOM Elements
 const activeModelEl = document.getElementById("active-model-id");
 const composerTextarea = document.getElementById("composer-textarea");
-const sprintStartBtn = document.getElementById("sprint-start-btn");
-const sprintStopBtn = document.getElementById("sprint-stop-btn");
+const sprintActionBtn = document.getElementById("sprint-action-btn");
+const drawerToggleBtn = document.getElementById("drawer-toggle-btn");
+const gridContainer = document.querySelector(".dashboard-grid");
+const pipelineNodes = document.querySelectorAll(".timeline-nodes .node");
 const terminalOutput = document.getElementById("terminal-output");
 const terminalName = document.getElementById("terminal-name");
 const terminalPulse = document.getElementById("terminal-pulse");
@@ -34,8 +37,6 @@ const previewFileContent = document.getElementById("preview-file-content");
 
 const metricRuns = document.getElementById("metric-runs");
 const metricSavings = document.getElementById("metric-savings");
-
-const tabButtons = document.querySelectorAll(".tab-btn");
 
 // GitHub DOM Elements
 const githubStatusDot = document.getElementById("github-status-dot");
@@ -147,22 +148,30 @@ function toggleSyncActionFields() {
 }
 
 function setupEventListeners() {
-  // Tab Bar Switching
-  tabButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      tabButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      activeAgent = btn.getAttribute("data-agent");
+  // Collapsible Control Panel Drawer Toggle
+  drawerToggleBtn.addEventListener("click", () => {
+    gridContainer.classList.toggle("drawer-collapsed");
+    const isCollapsed = gridContainer.classList.contains("drawer-collapsed");
+    drawerToggleBtn.textContent = isCollapsed ? "▶" : "◀";
+    drawerToggleBtn.title = isCollapsed ? "Show Control Panel" : "Hide Control Panel";
+  });
+
+  // Clickable Pipeline Nodes Tab Switching
+  pipelineNodes.forEach(node => {
+    node.addEventListener("click", () => {
+      activeAgent = node.getAttribute("data-agent");
       terminalName.textContent = `TERMINAL: ${activeAgent}_agent`;
+      
+      // Update visual active-tab class
+      pipelineNodes.forEach(n => n.classList.remove("active-tab"));
+      node.classList.add("active-tab");
+      
       fetchAgentLog(); // Immediate fetch on switch
     });
   });
 
-  // Launch Sprint Button
-  sprintStartBtn.addEventListener("click", launchSprint);
-
-  // Stop Sprint Button
-  sprintStopBtn.addEventListener("click", stopSprint);
+  // Sprint Toggle Action Button (Launch/Stop)
+  sprintActionBtn.addEventListener("click", handleSprintAction);
 
   // GitHub Sync Button
   githubSyncBtn.addEventListener("click", syncGitHubProject);
@@ -209,8 +218,8 @@ async function launchSprint() {
   };
   updateUIState();
 
-  sprintStartBtn.disabled = true;
-  sprintStartBtn.textContent = "Orchestrating... ⚡";
+  sprintActionBtn.disabled = true;
+  sprintActionBtn.textContent = "Orchestrating... ⚡";
   
   terminalOutput.textContent = "🚀 Launching sprint. Bootstrapping YC-style gStack team agents...\n";
 
@@ -228,13 +237,13 @@ async function launchSprint() {
                                    `🧠 Phase 1 (Think/CEO) started!\n`;
     } else {
       alert(`Error starting sprint: ${data.message}`);
-      sprintStartBtn.disabled = false;
-      sprintStartBtn.textContent = "Launch Sprint ⚡";
+      sprintActionBtn.disabled = false;
+      sprintActionBtn.textContent = "Launch Sprint ⚡";
     }
   } catch (e) {
     alert(`Failed to contact FastAPI server: ${e}`);
-    sprintStartBtn.disabled = false;
-    sprintStartBtn.textContent = "Launch Sprint ⚡";
+    sprintActionBtn.disabled = false;
+    sprintActionBtn.textContent = "Launch Sprint ⚡";
   }
 }
 
@@ -454,22 +463,46 @@ function updateUIState() {
     activeModelEl.textContent = state.metrics.active_model.split("/").pop();
   }
 
-  // 2. Sprint Start & Stop button state
+  // 2. Sprint Action Toggle Button State
   if (state.current_phase === "idle" || state.current_phase === "completed" || state.current_phase === "cancelled") {
-    sprintStartBtn.disabled = false;
-    sprintStartBtn.textContent = "Launch Sprint ⚡";
+    sprintActionBtn.disabled = false;
+    sprintActionBtn.className = "glow-button";
+    sprintActionBtn.textContent = "Launch Sprint ⚡";
     terminalPulse.style.display = "none";
-    sprintStopBtn.style.display = "none";
-    sprintStopBtn.disabled = false;
-    sprintStopBtn.textContent = "Stop Sprint 🛑";
   } else {
-    sprintStartBtn.disabled = true;
-    sprintStartBtn.textContent = "Sprint Running... ⚡";
+    // Keep it disabled if it is currently in "Stopping" state to prevent duplicate stop requests
+    if (sprintActionBtn.textContent === "Stopping... 🛑") {
+      sprintActionBtn.disabled = true;
+    } else {
+      sprintActionBtn.disabled = false;
+      sprintActionBtn.className = "glow-button red";
+      sprintActionBtn.textContent = "Stop Sprint 🛑";
+    }
     terminalPulse.style.display = "block";
-    sprintStopBtn.style.display = "block";
   }
 
-  // 3. Update Timeline Stages Nodes
+  // Auto-follow: if the current phase changed, automatically focus terminal on the new active agent
+  const currentRunningPhase = state.current_phase;
+  if (currentRunningPhase && currentRunningPhase !== lastObservedPhase) {
+    const phaseToAgentMap = {
+      think: "ceo",
+      plan: "eng_manager",
+      design: "designer",
+      build: "coder",
+      review: "release_engineer",
+      test: "qa_lead",
+      ship: "release_engineer"
+    };
+    
+    if (phaseToAgentMap[currentRunningPhase]) {
+      activeAgent = phaseToAgentMap[currentRunningPhase];
+      terminalName.textContent = `TERMINAL: ${activeAgent}_agent`;
+      fetchAgentLog(); // Fetch logs immediately for the new agent!
+    }
+    lastObservedPhase = currentRunningPhase;
+  }
+
+  // 3. Update Timeline Stages Nodes & Badges
   const phasesOrder = ["think", "plan", "design", "build", "review", "test", "ship"];
   const currentIdx = phasesOrder.indexOf(state.current_phase);
 
@@ -482,18 +515,44 @@ function updateUIState() {
     // Reset styles
     nodeEl.classList.remove("active", "completed", "cancelled");
 
+    const badgeEl = document.getElementById(`badge-${phase}`);
+    if (badgeEl) {
+      badgeEl.className = "node-status-badge";
+      badgeEl.innerHTML = "";
+    }
+
     // Connectors mapping
     const connector = nodeEl.nextElementSibling;
 
+    // Highlight currently viewed agent tab in terminal console
+    const viewedAgent = nodeEl.getAttribute("data-agent");
+    if (viewedAgent === activeAgent) {
+      nodeEl.classList.add("active-tab");
+    } else {
+      nodeEl.classList.remove("active-tab");
+    }
+
     if (state.phases[phase] && state.phases[phase].status === "cancelled") {
       nodeEl.classList.add("cancelled");
+      if (badgeEl) {
+        badgeEl.classList.add("active", "cancelled");
+        badgeEl.textContent = "✗";
+      }
       if (connector && connector.classList.contains("timeline-connector")) {
         connector.classList.remove("completed");
       }
     } else if (state.current_phase === phase) {
       nodeEl.classList.add("active");
+      if (badgeEl) {
+        badgeEl.classList.add("active", "running");
+        badgeEl.innerHTML = '<div class="mini-spinner"></div>';
+      }
     } else if (state.phases[phase] && state.phases[phase].status === "completed") {
       nodeEl.classList.add("completed");
+      if (badgeEl) {
+        badgeEl.classList.add("active", "completed");
+        badgeEl.textContent = "✓";
+      }
       if (connector && connector.classList.contains("timeline-connector")) {
         connector.classList.add("completed");
       }
@@ -519,6 +578,12 @@ function updateUIState() {
 }
 
 function renderWorkspaceTree(files) {
+  // Update dynamic file count badge
+  const fileCountEl = document.getElementById("file-count-badge");
+  if (fileCountEl) {
+    fileCountEl.textContent = `${files ? files.length : 0} Files`;
+  }
+
   if (!files || files.length === 0) {
     workspaceTree.innerHTML = `<span class="empty-state">No files built in workspace yet.</span>`;
     return;
@@ -605,13 +670,21 @@ function renderLatencyChart(history) {
   areaEl.setAttribute("d", dArea);
 }
 
+async function handleSprintAction() {
+  if (state.current_phase === "idle" || state.current_phase === "completed" || state.current_phase === "cancelled") {
+    await launchSprint();
+  } else {
+    await stopSprint();
+  }
+}
+
 async function stopSprint() {
   if (!confirm("Are you sure you want to stop the current sprint?")) {
     return;
   }
   
-  sprintStopBtn.disabled = true;
-  sprintStopBtn.textContent = "Stopping... 🛑";
+  sprintActionBtn.disabled = true;
+  sprintActionBtn.textContent = "Stopping... 🛑";
   
   try {
     const res = await fetch(`${API_BASE}/api/sprint/stop?_=${Date.now()}`, {
@@ -623,13 +696,13 @@ async function stopSprint() {
       terminalOutput.textContent += `\n🛑 Sprint cancellation requested successfully!\n`;
     } else {
       alert(`Error stopping sprint: ${data.message}`);
-      sprintStopBtn.disabled = false;
-      sprintStopBtn.textContent = "Stop Sprint 🛑";
+      sprintActionBtn.disabled = false;
+      sprintActionBtn.textContent = "Stop Sprint 🛑";
     }
   } catch (e) {
     alert(`Failed to contact FastAPI server: ${e}`);
-    sprintStopBtn.disabled = false;
-    sprintStopBtn.textContent = "Stop Sprint 🛑";
+    sprintActionBtn.disabled = false;
+    sprintActionBtn.textContent = "Stop Sprint 🛑";
   }
 }
 

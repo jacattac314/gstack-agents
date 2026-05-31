@@ -22,6 +22,7 @@
     <!-- 1. Header Area -->
     <header class="dashboard-header glass-card">
       <div class="header-logo">
+        <button id="drawer-toggle-btn" class="drawer-toggle-btn" title="Toggle Control Panel">◀</button>
         <span class="logo-icon">⚡</span>
         <h1>gStack <span class="tagline">Local Virtual Eng Team</span></h1>
       </div>
@@ -37,64 +38,11 @@
       </div>
     </header>
 
-    <!-- 2. Sprint Timeline Stages -->
-    <section class="timeline-container glass-card">
-      <div class="timeline-nodes">
-        <div class="node" id="node-think">
-          <div class="node-icon">🧠</div>
-          <div class="node-label">Think</div>
-          <div class="node-sub">CEO Agent</div>
-        </div>
-        <div class="timeline-connector"></div>
-        
-        <div class="node" id="node-plan">
-          <div class="node-icon">📋</div>
-          <div class="node-label">Plan</div>
-          <div class="node-sub">Eng Manager</div>
-        </div>
-        <div class="timeline-connector"></div>
-
-        <div class="node" id="node-design">
-          <div class="node-icon">🎨</div>
-          <div class="node-label">Design</div>
-          <div class="node-sub">Designer</div>
-        </div>
-        <div class="timeline-connector"></div>
-
-        <div class="node" id="node-build">
-          <div class="node-icon">🔨</div>
-          <div class="node-label">Build</div>
-          <div class="node-sub">Coder Agent</div>
-        </div>
-        <div class="timeline-connector"></div>
-
-        <div class="node" id="node-review">
-          <div class="node-icon">🔍</div>
-          <div class="node-label">Review</div>
-          <div class="node-sub">Release Eng</div>
-        </div>
-        <div class="timeline-connector"></div>
-
-        <div class="node" id="node-test">
-          <div class="node-icon">🧪</div>
-          <div class="node-label">Test</div>
-          <div class="node-sub">QA Lead</div>
-        </div>
-        <div class="timeline-connector"></div>
-
-        <div class="node" id="node-ship">
-          <div class="node-icon">🚀</div>
-          <div class="node-label">Ship</div>
-          <div class="node-sub">Release Eng</div>
-        </div>
-      </div>
-    </section>
-
     <!-- 3. Grid Workspace -->
     <main class="dashboard-grid">
       
-      <!-- COLUMN 1: Control Center & Telemetry -->
-      <aside class="grid-col flex-col gap-md">
+      <!-- COLUMN 1: Control Center & Telemetry (Drawer) -->
+      <aside class="grid-col flex-col gap-md left-drawer" id="left-drawer">
         
         <!-- GitHub Sync Panel -->
         <div class="glass-card panel-card padding-lg">
@@ -140,8 +88,7 @@
           <div class="composer-composer margin-top-md">
             <textarea id="composer-textarea" placeholder="e.g. Create a single-page index.html file with a gorgeous neon countdown timer for a product launch page. Include high-end hover effects and animations..."></textarea>
             <div class="button-group flex-col gap-sm margin-top-md">
-              <button id="sprint-start-btn" class="glow-button" style="margin-top:0;">Launch Sprint ⚡</button>
-              <button id="sprint-stop-btn" class="glow-button red" style="margin-top:0; display:none;">Stop Sprint 🛑</button>
+              <button id="sprint-action-btn" class="glow-button" style="margin-top:0;">Launch Sprint ⚡</button>
             </div>
           </div>
         </div>
@@ -181,21 +128,87 @@
         </div>
       </aside>
 
-      <!-- COLUMN 2: Agent Terminal Grid -->
-      <section class="grid-col flex-col glass-card panel-card">
+      <!-- COLUMN 2: Agent Terminal & Unified Pipeline -->
+      <section class="grid-col flex-col glass-card panel-card" style="padding: 16px;">
         
-        <!-- Tab Bar -->
-        <div class="terminal-tab-bar">
-          <button class="tab-btn active" data-agent="ceo">🧠 CEO</button>
-          <button class="tab-btn" data-agent="eng_manager">📋 EM</button>
-          <button class="tab-btn" data-agent="designer">🎨 Designer</button>
-          <button class="tab-btn" data-agent="coder">🔨 Coder</button>
-          <button class="tab-btn" data-agent="release_engineer">🔍 Review</button>
-          <button class="tab-btn" data-agent="qa_lead">🧪 QA</button>
+        <!-- Unified Clickable Pipeline Stepper -->
+        <div class="timeline-container" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 16px; margin-bottom: 12px; overflow-x: auto;">
+          <div class="timeline-nodes" style="min-width: 800px; display: flex; justify-content: space-between; align-items: center;">
+            
+            <div class="node active" data-agent="ceo" id="node-think">
+              <div class="node-icon-wrapper">
+                <div class="node-icon">🧠</div>
+                <div class="node-status-badge" id="badge-think"></div>
+              </div>
+              <div class="node-label">Think</div>
+              <div class="node-sub">CEO Agent</div>
+            </div>
+            <div class="timeline-connector"></div>
+            
+            <div class="node" data-agent="eng_manager" id="node-plan">
+              <div class="node-icon-wrapper">
+                <div class="node-icon">📋</div>
+                <div class="node-status-badge" id="badge-plan"></div>
+              </div>
+              <div class="node-label">Plan</div>
+              <div class="node-sub">Eng Manager</div>
+            </div>
+            <div class="timeline-connector"></div>
+
+            <div class="node" data-agent="designer" id="node-design">
+              <div class="node-icon-wrapper">
+                <div class="node-icon">🎨</div>
+                <div class="node-status-badge" id="badge-design"></div>
+              </div>
+              <div class="node-label">Design</div>
+              <div class="node-sub">Designer</div>
+            </div>
+            <div class="timeline-connector"></div>
+
+            <div class="node" data-agent="coder" id="node-build">
+              <div class="node-icon-wrapper">
+                <div class="node-icon">🔨</div>
+                <div class="node-status-badge" id="badge-build"></div>
+              </div>
+              <div class="node-label">Build</div>
+              <div class="node-sub">Coder Agent</div>
+            </div>
+            <div class="timeline-connector"></div>
+
+            <div class="node" data-agent="release_engineer" id="node-review">
+              <div class="node-icon-wrapper">
+                <div class="node-icon">🔍</div>
+                <div class="node-status-badge" id="badge-review"></div>
+              </div>
+              <div class="node-label">Review</div>
+              <div class="node-sub">Release Eng</div>
+            </div>
+            <div class="timeline-connector"></div>
+
+            <div class="node" data-agent="qa_lead" id="node-test">
+              <div class="node-icon-wrapper">
+                <div class="node-icon">🧪</div>
+                <div class="node-status-badge" id="badge-test"></div>
+              </div>
+              <div class="node-label">Test</div>
+              <div class="node-sub">QA Lead</div>
+            </div>
+            <div class="timeline-connector"></div>
+
+            <div class="node" data-agent="release_engineer" id="node-ship">
+              <div class="node-icon-wrapper">
+                <div class="node-icon">🚀</div>
+                <div class="node-status-badge" id="badge-ship"></div>
+              </div>
+              <div class="node-label">Ship</div>
+              <div class="node-sub">Release Eng</div>
+            </div>
+            
+          </div>
         </div>
 
         <!-- Terminal Console -->
-        <div class="terminal-console">
+        <div class="terminal-console" style="margin: 0; flex-grow: 1; display: flex; flex-direction: column;">
           <div class="terminal-header">
             <div class="window-dot red"></div>
             <div class="window-dot yellow"></div>
@@ -203,32 +216,35 @@
             <span class="terminal-title" id="terminal-name">TERMINAL: ceo_agent</span>
             <div class="terminal-spinner" id="terminal-pulse" style="display:none;"></div>
           </div>
-          <div class="terminal-body" id="terminal-output">
+          <div class="terminal-body" id="terminal-output" style="max-height: 480px; flex-grow: 1;">
 Waiting to launch GStack local agents... Ready.
           </div>
         </div>
       </section>
 
-      <!-- COLUMN 3: Workspace Files & Code Inspector -->
-      <section class="grid-col flex-col gap-md">
-        
-        <!-- Files Inspector -->
-        <div class="glass-card panel-card padding-lg flex-grow-1 flex-col">
-          <h2 class="panel-title">Workspace Output Files</h2>
-          <p class="panel-desc">Real-time local files created or edited inside your physical workspace.</p>
-          <div class="workspace-tree flex-grow-1 margin-top-md" id="workspace-tree">
-            <span class="empty-state">No files built in workspace yet.</span>
-          </div>
+      <!-- COLUMN 3: Workspace Inspector -->
+      <section class="grid-col flex-col glass-card panel-card padding-lg gap-md" style="min-height: 500px; display: flex; flex-direction: column;">
+        <div class="flex-col gap-xs">
+          <h2 class="panel-title" style="display: flex; align-items: center; width: 100%;">
+            <span>Workspace Inspector</span>
+            <span id="file-count-badge" class="file-count-badge">0 Files</span>
+          </h2>
+          <p class="panel-desc">Real-time local files created or edited. Select a file to view code.</p>
         </div>
 
-        <!-- Code Preview Console -->
-        <div class="glass-card panel-card padding-lg flex-grow-2 flex-col">
-          <h2 class="panel-title" id="preview-file-title">File Code Viewer</h2>
-          <div class="code-viewer-container flex-grow-1 margin-top-sm">
-            <pre class="code-viewer-body" id="preview-file-content">Select a file from the workspace above to inspect its code contents in real time.</pre>
+        <!-- Scrollable File Tree -->
+        <div class="workspace-tree flex-grow-1" id="workspace-tree" style="max-height: 180px; overflow-y: auto; margin-top: 8px;">
+          <span class="empty-state">No files built in workspace yet.</span>
+        </div>
+
+        <!-- Docked File Code Viewer -->
+        <div class="flex-col" style="flex-grow: 2; display: flex; flex-direction: column; min-height: 240px; margin-top: 8px;">
+          <h3 class="panel-title-sub" id="preview-file-title" style="margin-bottom: 8px;">File Code Viewer</h3>
+          <div class="code-viewer-container flex-grow-1" style="flex-grow: 1; display: flex;">
+            <pre class="code-viewer-body" id="preview-file-content" style="flex-grow: 1; margin: 0; padding: 12px; border-radius: 8px;">Select a file from the workspace above to inspect its code contents in real time.</pre>
           </div>
         </div>
-      </aside>
+      </section>
 
     </main>
   </div>

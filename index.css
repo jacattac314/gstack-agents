@@ -650,3 +650,173 @@ body {
   height: 1px;
   background: rgba(255, 255, 255, 0.08);
 }
+
+/* ====================================================================
+   10. Consolidated Redesign Classes (Unified Pipeline & Collapsible Rails)
+   ==================================================================== */
+
+/* Dashboard Layout Grid Transition */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr 340px;
+  gap: 24px;
+  transition: grid-template-columns var(--transition-normal);
+}
+.dashboard-grid.drawer-collapsed {
+  grid-template-columns: 0px 1fr 340px;
+  gap: 24px;
+}
+
+/* Left Drawer Slide & Fade */
+.left-drawer {
+  transition: opacity var(--transition-fast), visibility var(--transition-fast), width var(--transition-normal);
+  opacity: 1;
+  visibility: visible;
+  overflow: hidden;
+  width: 340px;
+}
+.dashboard-grid.drawer-collapsed .left-drawer {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  width: 0;
+}
+
+/* Premium Drawer Toggle Button inside Header */
+.drawer-toggle-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-right: 12px;
+}
+.drawer-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-cyan);
+  border-color: rgba(6, 182, 212, 0.3);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.15);
+}
+.drawer-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+/* Stepper Node Click States & Hover */
+.node {
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--transition-fast);
+}
+.node:hover {
+  transform: translateY(-2px);
+}
+.node:hover .node-icon {
+  border-color: var(--color-cyan);
+  background: rgba(6, 182, 212, 0.05);
+  box-shadow: 0 0 10px var(--color-cyan-glow);
+}
+
+/* Stepper Node Status Badge overlays */
+.node-icon-wrapper {
+  position: relative;
+  display: inline-block;
+}
+.node-status-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-main);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 8px;
+  font-weight: 700;
+  transition: all var(--transition-fast);
+  opacity: 0;
+  transform: scale(0.6);
+}
+.node-status-badge.active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Badge Status Styles */
+.node-status-badge.completed {
+  background-color: var(--color-green);
+  border-color: var(--color-green);
+  color: white;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+.node-status-badge.running {
+  background-color: #0284C7;
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 8px var(--color-cyan-glow);
+}
+.node-status-badge.cancelled {
+  background-color: var(--color-red);
+  border-color: var(--color-red);
+  color: white;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+/* Stepper CSS Mini Spinner */
+.mini-spinner {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--color-cyan);
+  border-radius: 50%;
+  animation: spinnerRotate 0.8s linear infinite;
+}
+@keyframes spinnerRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Workspace Inspector Classes */
+.file-count-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--color-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-family: var(--font-mono);
+  margin-left: auto;
+}
+
+.workspace-tree::-webkit-scrollbar {
+  width: 6px;
+}
+.workspace-tree::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+.workspace-tree::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  transition: background var(--transition-fast);
+}
+.workspace-tree::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.3);
+}
+
+.panel-title-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-left: 2px solid var(--color-cyan);
+  padding-left: 8px;
+}
+
