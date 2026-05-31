@@ -83,6 +83,30 @@ async def serve_js():
 # --------------------------------------------------------------------
 # REST API Endpoints
 # --------------------------------------------------------------------
+def verify_token_direct(token: str):
+    """Verifies the GitHub token directly via GitHub API and returns (username, is_valid)."""
+    import urllib.request
+    import urllib.error
+    import json
+    if not token:
+        return None, False
+    req = urllib.request.Request(
+        "https://api.github.com/user",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "GStack-Agent-Console"
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode())
+                return data.get("login", "Unknown"), True
+    except Exception as e:
+        print(f"Direct token verification failed: {e}")
+    return None, False
+
 @app.get("/api/github/status")
 async def api_github_status():
     """Checks the active git remote configuration and gh auth status."""
@@ -97,7 +121,8 @@ async def api_github_status():
                 cwd=WORKSPACE_DIR,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                timeout=5
             )
             if res.returncode == 0 and res.stdout:
                 # Redact token from url for security
@@ -107,35 +132,19 @@ async def api_github_status():
         except Exception:
             pass
             
-    # Check gh CLI authentication status using environment token
+    # Check token verification directly
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     gh_user = "Unknown"
     is_authenticated = False
     
-    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-    
-    env = os.environ.copy()
     if token:
-        env["GH_TOKEN"] = token
-        env["GITHUB_TOKEN"] = token
-        
-    try:
-        res = subprocess.run(
-            "gh auth status",
-            shell=True,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        output = res.stderr + "\n" + res.stdout
-        match = re.search(r"Logged in to github\.com account ([a-zA-Z0-9_-]+)", output)
-        if match:
-            gh_user = match.group(1)
-            is_authenticated = True
-        elif "Logged in to github.com" in output:
-            is_authenticated = True
-    except Exception:
-        pass
+        try:
+            username, is_valid = verify_token_direct(token)
+            if is_valid:
+                gh_user = username
+                is_authenticated = True
+        except Exception:
+            pass
         
     return {
         "authenticated": is_authenticated,
@@ -151,28 +160,10 @@ async def api_github_login(payload: dict):
         raise HTTPException(status_code=400, detail="Missing GitHub Personal Access Token (PAT)")
         
     try:
-        # Verify the token by checking gh auth status using this token
-        env = os.environ.copy()
-        env["GH_TOKEN"] = token
-        env["GITHUB_TOKEN"] = token
-        
-        res = subprocess.run(
-            "gh auth status",
-            shell=True,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        output = res.stderr + "\n" + res.stdout
-        match = re.search(r"Logged in to github\.com account ([a-zA-Z0-9_-]+)", output)
-        if not match:
-            # Fallback check
-            if "Active account: true" not in output and "Logged in to github.com" not in output:
-                raise Exception("The provided token is invalid or unauthorized by GitHub.")
-            username = "jacattac314"
-        else:
-            username = match.group(1)
+        # Verify the token by calling the GitHub API directly
+        username, is_valid = verify_token_direct(token)
+        if not is_valid:
+            raise Exception("The provided token is invalid or unauthorized by GitHub.")
             
         # Write token to .env
         with open(ENV_FILE_PATH, "w") as f:
@@ -193,7 +184,8 @@ async def api_github_login(payload: dict):
                     cwd=WORKSPACE_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True
+                    text=True,
+                    timeout=5
                 )
                 if res_url.returncode == 0 and res_url.stdout:
                     url = res_url.stdout.strip()
@@ -201,7 +193,7 @@ async def api_github_login(payload: dict):
                     clean_url = re.sub(r"https://[^@]+@", "https://", url)
                     repo_path = clean_url.replace("https://github.com/", "")
                     authed_url = f"https://{username}:{token}@github.com/{repo_path}"
-                    subprocess.run(f"git remote set-url origin {authed_url}", shell=True, cwd=WORKSPACE_DIR)
+                    subprocess.run(f"git remote set-url origin {authed_url}", shell=True, cwd=WORKSPACE_DIR, timeout=5)
             except Exception:
                 pass
                 
@@ -215,6 +207,7 @@ async def api_github_login(payload: dict):
             "status": "error",
             "message": f"Authentication failed: {str(e)}"
         }
+
 
 @app.post("/api/github/sync")
 async def api_github_sync(payload: dict):

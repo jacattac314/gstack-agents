@@ -54,7 +54,7 @@ const githubDivider = document.getElementById("github-divider");
 // --------------------------------------------------------------------
 async function initializeDashboard() {
   try {
-    const res = await fetch(`${API_BASE}/api/models`);
+    const res = await fetch(`${API_BASE}/api/models?_=${Date.now()}`);
     const data = await res.json();
     if (data.active_model) {
       activeModelEl.textContent = data.active_model.split("/").pop();
@@ -112,7 +112,7 @@ async function launchSprint() {
   terminalOutput.textContent = "🚀 Launching sprint. Bootstrapping YC-style gStack team agents...\n";
 
   try {
-    const res = await fetch(`${API_BASE}/api/sprint/start`, {
+    const res = await fetch(`${API_BASE}/api/sprint/start?_=${Date.now()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal: goalText })
@@ -152,7 +152,7 @@ async function loginGitHub() {
   githubFeedback.style.color = "var(--color-yellow)";
 
   try {
-    const res = await fetch(`${API_BASE}/api/github/login`, {
+    const res = await fetch(`${API_BASE}/api/github/login?_=${Date.now()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token })
@@ -195,7 +195,7 @@ async function syncGitHubProject() {
   githubFeedback.style.color = "var(--color-yellow)";
 
   try {
-    const res = await fetch(`${API_BASE}/api/github/sync`, {
+    const res = await fetch(`${API_BASE}/api/github/sync?_=${Date.now()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, repo_name: repoName })
@@ -228,7 +228,7 @@ async function syncGitHubProject() {
 
 async function fetchGitHubStatus() {
   try {
-    const res = await fetch(`${API_BASE}/api/github/status`);
+    const res = await fetch(`${API_BASE}/api/github/status?_=${Date.now()}`);
     const data = await res.json();
     
     if (data && data.authenticated) {
@@ -276,7 +276,7 @@ function startPollers() {
 
 async function fetchSprintStatus() {
   try {
-    const res = await fetch(`${API_BASE}/api/sprint/status`);
+    const res = await fetch(`${API_BASE}/api/sprint/status?_=${Date.now()}`);
     const data = await res.json();
     if (data && data.current_phase) {
       state = data;
@@ -287,7 +287,7 @@ async function fetchSprintStatus() {
 
 async function fetchAgentLog() {
   try {
-    const res = await fetch(`${API_BASE}/api/agent/log?agent=${activeAgent}`);
+    const res = await fetch(`${API_BASE}/api/agent/log?agent=${activeAgent}&_=${Date.now()}`);
     const data = await res.json();
     if (data && data.log) {
       // Auto scroll terminal if user is at bottom
@@ -302,7 +302,7 @@ async function fetchAgentLog() {
 
 async function fetchWorkspaceFiles() {
   try {
-    const res = await fetch(`${API_BASE}/api/workspace/files`);
+    const res = await fetch(`${API_BASE}/api/workspace/files?_=${Date.now()}`);
     const data = await res.json();
     if (data && data.files) {
       renderWorkspaceTree(data.files);
@@ -400,7 +400,7 @@ async function inspectFile(filename) {
   fetchWorkspaceFiles();
 
   try {
-    const res = await fetch(`${API_BASE}/api/workspace/file?path=${filename}`);
+    const res = await fetch(`${API_BASE}/api/workspace/file?path=${filename}&_=${Date.now()}`);
     const data = await res.json();
     if (data && data.content) {
       previewFileContent.textContent = data.content;
@@ -460,4 +460,8 @@ function renderLatencyChart(history) {
 }
 
 // Launch initialization
-document.addEventListener("DOMContentLoaded", initializeDashboard);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeDashboard);
+} else {
+  initializeDashboard();
+}
