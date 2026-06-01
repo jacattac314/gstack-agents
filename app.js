@@ -90,6 +90,7 @@ async function initializeDashboard() {
 // 2. Tab Bar & Action Event Listeners & Repositories Fetcher
 // --------------------------------------------------------------------
 let fetchedRepos = [];
+let repoToSelectAfterFetch = null;
 
 async function fetchUserRepositories() {
   try {
@@ -120,8 +121,11 @@ function populateRepoDropdown(filteredList = null) {
   
   githubRepoSelect.innerHTML = html;
   
-  // Try to preserve selection if possible, otherwise default to first
-  if (currentVal && listToUse.some(r => r.name === currentVal)) {
+  // Auto-select the newly synced/created repository if registered
+  if (repoToSelectAfterFetch && listToUse.some(r => r.name === repoToSelectAfterFetch)) {
+    githubRepoSelect.value = repoToSelectAfterFetch;
+    repoToSelectAfterFetch = null; // Reset single-shot trigger
+  } else if (currentVal && listToUse.some(r => r.name === currentVal)) {
     githubRepoSelect.value = currentVal;
   }
 }
@@ -488,14 +492,21 @@ async function syncGitHubProject() {
         composerTextarea.placeholder = `Connected to remote repo. Suggest goals like: 'Inspect the files and fix any bugs in README.md' or 'Add a unit test script'`;
       }
       
+      // Track newly created/synced repo for auto-selection
+      repoToSelectAfterFetch = repoName;
+      
       // Reset fetched repos list to force reload new repo addition on next status check
       fetchedRepos = [];
+      
+      // Automatically toggle sync action to connect to reveal repositories dropdown
+      githubSyncAction.value = "connect";
+      toggleSyncActionFields();
       
       // Clear inputs
       githubRepoName.value = "";
       githubRepoDesc.value = "";
       
-      // Immediately refresh workspace files tree
+      // Immediately refresh views
       fetchWorkspaceFiles();
       fetchGitHubStatus();
     } else {
@@ -534,6 +545,16 @@ async function fetchGitHubStatus() {
       
       if (data.active_repo && data.active_repo !== "Not Configured") {
         const repoNameOnly = data.active_repo.split("/").pop().replace(".git", "");
+        
+        // Dynamically align repositories dropdown selector with backend active repo state
+        if (githubSyncAction.value === "connect" && githubRepoSelect.value !== repoNameOnly) {
+          if (Array.from(githubRepoSelect.options).some(opt => opt.value === repoNameOnly)) {
+            githubRepoSelect.value = repoNameOnly;
+          } else {
+            repoToSelectAfterFetch = repoNameOnly;
+          }
+        }
+        
         if (isInitialLoad) {
           if (githubSyncAction.value === "connect") {
             githubRepoSelect.value = repoNameOnly;
