@@ -525,6 +525,45 @@ async def api_post_provider_config(payload: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/config/freellmapi/models")
+async def api_get_freellmapi_models(url: str = None, token: str = None):
+    """Proxies models retrieval from the configured FreeLLMAPI instance to prevent client-side CORS issues."""
+    config = load_provider_config()
+    base_url = url or config.get("freellmapi_url", "http://localhost:3001/v1")
+    base_url = base_url.rstrip("/")
+    target_url = f"{base_url}/models"
+    
+    actual_token = token if token is not None else config.get("freellmapi_token", "")
+    actual_token = actual_token.strip()
+    
+    headers = {}
+    if actual_token:
+        headers["Authorization"] = f"Bearer {actual_token}"
+        
+    import urllib.request
+    import json
+    req = urllib.request.Request(target_url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                return json.loads(response.read().decode())
+    except Exception as e:
+        print(f"Proxy models fetch failed: {e}. Serving premium fallback list.")
+        
+    # Fallback list of popular models if FreeLLMAPI is offline, unreachable or unauthenticated
+    return {
+        "data": [
+            {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "owned_by": "google"},
+            {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B", "owned_by": "groq"},
+            {"id": "gpt-4o", "name": "GPT-4o", "owned_by": "github"},
+            {"id": "mistral-large-latest", "name": "Mistral Large 3", "owned_by": "mistral"},
+            {"id": "codestral-latest", "name": "Codestral", "owned_by": "mistral"},
+            {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B", "owned_by": "groq"},
+            {"id": "meta-llama/llama-3.3-70b-instruct:free", "name": "Llama 3.3 70B (free)", "owned_by": "openrouter"},
+            {"id": "nousresearch/hermes-3-llama-3.1-405b:free", "name": "Hermes 3 405B (free)", "owned_by": "openrouter"}
+        ]
+    }
+
 @app.get("/api/models")
 async def api_models():
     config = load_provider_config()

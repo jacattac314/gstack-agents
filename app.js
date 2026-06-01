@@ -32,7 +32,7 @@ const providerSelect = document.getElementById("provider-select");
 const freellmapiConfigSection = document.getElementById("freellmapi-config-section");
 const freellmapiUrlInput = document.getElementById("freellmapi-url");
 const freellmapiTokenInput = document.getElementById("freellmapi-token");
-const freellmapiModelInput = document.getElementById("freellmapi-model");
+const freellmapiModelSelect = document.getElementById("freellmapi-model-select");
 const providerSaveBtn = document.getElementById("provider-save-btn");
 const gridContainer = document.querySelector(".dashboard-grid");
 const pipelineNodes = document.querySelectorAll(".timeline-nodes .node");
@@ -204,14 +204,83 @@ function setupEventListeners() {
   
   // Save LLM config button click
   providerSaveBtn.addEventListener("click", saveLLMProviderConfig);
+
+  // Dynamic model loading when URL or Token is updated
+  const refreshModelsList = () => {
+    if (providerSelect.value === "freellmapi") {
+      fetchFreeLLMAPIModels(
+        freellmapiModelSelect.value || null,
+        freellmapiUrlInput.value.trim() || null,
+        freellmapiTokenInput.value.trim() || null
+      );
+    }
+  };
+  freellmapiUrlInput.addEventListener("blur", refreshModelsList);
+  freellmapiUrlInput.addEventListener("change", refreshModelsList);
+  freellmapiTokenInput.addEventListener("blur", refreshModelsList);
+  freellmapiTokenInput.addEventListener("change", refreshModelsList);
 }
 
 function toggleProviderConfigFields() {
   const provider = providerSelect.value;
   if (provider === "freellmapi") {
     freellmapiConfigSection.style.display = "flex";
+    // Fetch models automatically if provider is active
+    fetchFreeLLMAPIModels(
+      freellmapiModelSelect.value || null,
+      freellmapiUrlInput.value.trim() || null,
+      freellmapiTokenInput.value.trim() || null
+    );
   } else {
     freellmapiConfigSection.style.display = "none";
+  }
+}
+
+async function fetchFreeLLMAPIModels(selectedModel = null, url = null, token = null) {
+  try {
+    freellmapiModelSelect.innerHTML = `<option value="">Loading models list... ⏳</option>`;
+    let fetchUrl = `${API_BASE}/api/config/freellmapi/models?_=${Date.now()}`;
+    if (url) {
+      fetchUrl += `&url=${encodeURIComponent(url)}`;
+    }
+    if (token) {
+      fetchUrl += `&token=${encodeURIComponent(token)}`;
+    }
+    const res = await fetch(fetchUrl);
+    const data = await res.json();
+    
+    if (data && data.data) {
+      let html = "";
+      data.data.forEach(model => {
+        const nameLabel = model.name ? `${model.name} (${model.owned_by || 'proxy'})` : model.id;
+        html += `<option value="${model.id}">${nameLabel}</option>`;
+      });
+      freellmapiModelSelect.innerHTML = html;
+      
+      if (selectedModel) {
+        const exactMatch = data.data.some(m => m.id === selectedModel);
+        if (exactMatch) {
+          freellmapiModelSelect.value = selectedModel;
+        } else {
+          const flexibleMatch = data.data.find(m => m.id.endsWith('/' + selectedModel) || selectedModel.endsWith('/' + m.id));
+          if (flexibleMatch) {
+            freellmapiModelSelect.value = flexibleMatch.id;
+          } else {
+            // Append as fallback option to ensure it's selected and not lost
+            const opt = document.createElement("option");
+            opt.value = selectedModel;
+            opt.textContent = `${selectedModel} (current)`;
+            freellmapiModelSelect.appendChild(opt);
+            freellmapiModelSelect.value = selectedModel;
+          }
+        }
+      }
+    } else {
+      freellmapiModelSelect.innerHTML = `<option value="">No models resolved</option>`;
+    }
+  } catch (e) {
+    console.error("Failed to fetch FreeLLMAPI models list:", e);
+    freellmapiModelSelect.innerHTML = `<option value="">Error loading models</option>`;
   }
 }
 
@@ -223,7 +292,10 @@ async function fetchProviderConfig() {
       providerSelect.value = data.provider || "lm_studio";
       freellmapiUrlInput.value = data.freellmapi_url || "http://localhost:3001/v1";
       freellmapiTokenInput.value = data.freellmapi_token || "";
-      freellmapiModelInput.value = data.freellmapi_model || "google/gemini-2.5-flash";
+      
+      // Load the models list dynamically, and then select the active model
+      await fetchFreeLLMAPIModels(data.freellmapi_model, data.freellmapi_url, data.freellmapi_token);
+      
       toggleProviderConfigFields();
     }
   } catch (e) {
@@ -235,7 +307,7 @@ async function saveLLMProviderConfig() {
   const provider = providerSelect.value;
   const url = freellmapiUrlInput.value.trim();
   const token = freellmapiTokenInput.value.trim();
-  const model = freellmapiModelInput.value.trim();
+  const model = freellmapiModelSelect.value;
   
   providerSaveBtn.disabled = true;
   providerSaveBtn.textContent = "Saving... 💾";
