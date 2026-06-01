@@ -2,5 +2,5 @@
   "provider": "freellmapi",
   "freellmapi_url": "http://localhost:3001/v1",
   "freellmapi_token": "freellmapi-146782bd37090f5d70da78ceb97727047b2ee3225f9a1b5b",
-  "freellmapi_model": "google/gemini-2.5-flash"
+  "freellmapi_model": "auto"
 }

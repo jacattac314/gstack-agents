@@ -166,10 +166,15 @@ def tool_read_file(path: str) -> str:
         return f"Error reading file: {e}"
 
 def tool_write_file(path: str, content: str) -> str:
-    """Writes a file in the workspace."""
-    safe_path = os.path.join(WORKSPACE_DIR, os.path.basename(path))
+    """Writes a file in the workspace, preserving subdirectories safely."""
+    norm = os.path.normpath(path).lstrip(os.sep)
+    safe_path = os.path.join(WORKSPACE_DIR, norm)
+    # Prevent path traversal outside the workspace
+    if not os.path.abspath(safe_path).startswith(os.path.abspath(WORKSPACE_DIR) + os.sep):
+        return f"Error: refusing to write outside workspace: {path}"
     try:
-        with open(safe_path, 'w') as f:
+        os.makedirs(os.path.dirname(safe_path), exist_ok=True)
+        with open(safe_path, "w") as f:
             f.write(content)
         return f"Success: File '{path}' written successfully."
     except Exception as e:
@@ -242,7 +247,15 @@ async def execute_agent_with_tools(role_name: str, system_prompt: str, user_prom
         "   <write_file path=\"filename.ext\">\nfile_content_here\n</write_file>\n"
         "4. Run Shell Command (python execution, tests, compilation, git):\n"
         "   <run_command>your_shell_command_here</run_command>\n\n"
-        "Rule: When you are finished and have completed your task, conclude your turn by summarizing your findings."
+        "Rule: When you are finished and have completed your task, conclude your turn by summarizing your findings.\n\n"
+        "==================================================\n"
+        "🚨 DELIVERY CONTRACT (CRITICAL RULES FOR EVERY SPRINT):\n"
+        "- This is an implementation sprint, not a planning phase. Producing only a PRD, spec, design, or README with no working code is a FAILED sprint.\n"
+        "- Every sprint must end with a working, runnable artifact written to disk via `<write_file>`. Put it in a NEW, clearly named file (e.g., game.html, app/main.html). Never overwrite existing platform files (server.py, gstack_core.py, index.html, app.js).\n"
+        "- Prefer a single self-contained file (inlined HTML/CSS/JS) with no external stubs, placeholders, TODOs, or truncated code.\n"
+        "- Coder Agent MUST call `<write_file>` with full, complete contents, then verify by checking it's present and non-empty.\n"
+        "- QA Lead/Reviewers MUST verify the file is present, functional, self-contained, and non-empty before finishing.\n"
+        "==================================================\n"
     )
     
     active_system_prompt = system_prompt + tool_instructions
@@ -290,7 +303,12 @@ async def execute_agent_with_tools(role_name: str, system_prompt: str, user_prom
             tool_executed = True
             
         if not tool_executed:
-            # The agent did not invoke any more tools; finalize
+            if role_name == "coder" and turn == 0:
+                conversation_history += (
+                    "\n\n[Orchestrator]: You did not emit any tool tag. You must actually "
+                    "write the file now using <write_file path=\"...\">...</write_file>."
+                )
+                continue
             break
             
     with open(log_path, "a") as f:
@@ -451,8 +469,59 @@ class GStackSprintOrchestrator:
         self.save_state()
         
         coder_system = load_skill_prompt("coder")
-        coder_summary = await execute_agent_with_tools("coder", coder_system, f"Sprint Goal: {self.sprint_goal}\n\nTech Specs:\n{em_summary}\n\nDesign Styles:\n{designer_summary}")
-        
+
+        # Snapshot workspace before build so we can detect new/changed files
+        PROTECTED = {"server.py", "gstack_core.py", "index.html", "index.css",
+                     "app.js", "requirements.txt"}
+
+        def _workspace_snapshot():
+            snap = {}
+            for f in os.listdir(WORKSPACE_DIR):
+                p = os.path.join(WORKSPACE_DIR, f)
+                if os.path.isfile(p):
+                    snap[f] = os.path.getsize(p)
+            return snap
+
+        before = _workspace_snapshot()
+
+        coder_summary = ""
+        max_build_attempts = 3
+        for attempt in range(max_build_attempts):
+            extra = "" if attempt == 0 else (
+                "\n\nIMPORTANT: The previous attempt did NOT write any runnable file. "
+                "You MUST emit a <write_file path=\"...\">...full code...</write_file> tag "
+                "with the COMPLETE contents now. Do not just describe it."
+            )
+            coder_summary = await execute_agent_with_tools(
+                "coder", coder_system,
+                f"Sprint Goal: {self.sprint_goal}\n\nTech Specs:\n{em_summary}\n\n"
+                f"Design Styles:\n{designer_summary}{extra}"
+            )
+
+            after = _workspace_snapshot()
+            # A real deliverable = a new file (not protected) OR a non-protected file that grew
+            new_files = [f for f in after
+                         if f not in PROTECTED and not f.lower().endswith(".md")
+                         and (f not in before or after[f] != before.get(f))
+                         and after[f] > 0]
+            if new_files:
+                self.state["phases"]["build"]["deliverable"] = new_files[0]
+                break
+        else:
+            # No runnable file after all attempts — mark the phase failed instead of "completed"
+            self.state["phases"]["build"]["status"] = "failed"
+            self.state["phases"]["build"]["error"] = (
+                "Coder produced no runnable file (likely emitted prose instead of a "
+                "<write_file> tag). Deliverable missing."
+            )
+            self.save_state()
+
+        if self.state["phases"]["build"]["status"] == "failed":
+            self.state["current_phase"] = "failed"
+            self.save_state()
+            print("\n❌ Build failed. Stopping sprint execution.")
+            return
+
         if self.is_cancelled:
             return
             
