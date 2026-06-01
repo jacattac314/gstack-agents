@@ -188,7 +188,12 @@ function setupEventListeners() {
 
   // Launch App Button
   sprintLaunchAppBtn.addEventListener("click", () => {
-    window.open("/workspace/app/index.html", "_blank");
+    const deliverable = state.phases && state.phases.build && state.phases.build.deliverable;
+    if (deliverable) {
+      window.open(`/workspace/app/${deliverable}`, "_blank");
+    } else {
+      window.open("/workspace/app/index.html", "_blank");
+    }
   });
 
   // GitHub Sync Button
@@ -223,6 +228,30 @@ function setupEventListeners() {
   freellmapiUrlInput.addEventListener("change", refreshModelsList);
   freellmapiTokenInput.addEventListener("blur", refreshModelsList);
   freellmapiTokenInput.addEventListener("change", refreshModelsList);
+
+  // Workspace Tab buttons
+  const tabCodeBtn = document.getElementById("tab-code-btn");
+  const tabPreviewBtn = document.getElementById("tab-preview-btn");
+  const livePreviewRefresh = document.getElementById("live-preview-refresh");
+
+  if (tabCodeBtn && tabPreviewBtn) {
+    tabCodeBtn.addEventListener("click", () => switchTab("code"));
+    tabPreviewBtn.addEventListener("click", () => switchTab("preview"));
+  }
+
+  if (livePreviewRefresh) {
+    livePreviewRefresh.addEventListener("click", () => {
+      const iframe = document.getElementById("live-preview-iframe");
+      if (iframe) {
+        // Force refresh iframe by resetting its src
+        const currentSrc = iframe.src;
+        iframe.src = "about:blank";
+        setTimeout(() => {
+          iframe.src = currentSrc;
+        }, 50);
+      }
+    });
+  }
 }
 
 function toggleProviderConfigFields() {
@@ -667,6 +696,20 @@ function updateUIState() {
     sprintLaunchAppBtn.style.display = "none";
   }
 
+  // Update Live Preview Iframe with Coder deliverable if available
+  const deliverable = state.phases && state.phases.build && state.phases.build.deliverable;
+  if (deliverable && deliverable.toLowerCase().endsWith(".html")) {
+    const iframe = document.getElementById("live-preview-iframe");
+    const previewUrl = document.getElementById("live-preview-url");
+    if (iframe && previewUrl && iframe.src.indexOf(deliverable) === -1) {
+      const url = `/workspace/app/${deliverable}`;
+      iframe.src = url;
+      previewUrl.textContent = url;
+      // Auto-switch to Live Preview tab to show the user the live progress!
+      switchTab("preview");
+    }
+  }
+
   // Auto-follow: if the current phase changed, automatically focus terminal on the new active agent
   const currentRunningPhase = state.current_phase;
   if (currentRunningPhase && currentRunningPhase !== lastObservedPhase) {
@@ -801,6 +844,22 @@ async function inspectFile(filename) {
     const data = await res.json();
     if (data && data.content) {
       previewFileContent.textContent = data.content;
+      
+      // If it's a HTML file, load it inside the live preview iframe!
+      if (filename.toLowerCase().endsWith(".html")) {
+        const iframe = document.getElementById("live-preview-iframe");
+        const previewUrl = document.getElementById("live-preview-url");
+        if (iframe && previewUrl) {
+          const url = `/workspace/app/${filename}`;
+          iframe.src = url;
+          previewUrl.textContent = url;
+          // Auto-switch to Live Preview tab to show the rendered output!
+          switchTab("preview");
+        }
+      } else {
+        // If we select a non-HTML file, switch back to the code tab
+        switchTab("code");
+      }
     } else {
       previewFileContent.textContent = "Error: Could not read file content.";
     }
@@ -889,6 +948,39 @@ async function stopSprint() {
     alert(`Failed to contact FastAPI server: ${e}`);
     sprintActionBtn.disabled = false;
     sprintActionBtn.textContent = "Stop Sprint 🛑";
+  }
+}
+
+function switchTab(tabName) {
+  const tabCodeBtn = document.getElementById("tab-code-btn");
+  const tabPreviewBtn = document.getElementById("tab-preview-btn");
+  const tabCodeContent = document.getElementById("tab-code-content");
+  const tabPreviewContent = document.getElementById("tab-preview-content");
+
+  if (!tabCodeBtn || !tabPreviewBtn || !tabCodeContent || !tabPreviewContent) return;
+
+  if (tabName === "code") {
+    tabCodeBtn.classList.add("active");
+    tabCodeBtn.style.background = "rgba(255, 255, 255, 0.08)";
+    tabCodeBtn.style.color = "var(--text-color)";
+    
+    tabPreviewBtn.classList.remove("active");
+    tabPreviewBtn.style.background = "none";
+    tabPreviewBtn.style.color = "rgba(255, 255, 255, 0.6)";
+    
+    tabCodeContent.style.display = "flex";
+    tabPreviewContent.style.display = "none";
+  } else if (tabName === "preview") {
+    tabPreviewBtn.classList.add("active");
+    tabPreviewBtn.style.background = "rgba(255, 255, 255, 0.08)";
+    tabPreviewBtn.style.color = "var(--text-color)";
+    
+    tabCodeBtn.classList.remove("active");
+    tabCodeBtn.style.background = "none";
+    tabCodeBtn.style.color = "rgba(255, 255, 255, 0.6)";
+    
+    tabPreviewContent.style.display = "flex";
+    tabCodeContent.style.display = "none";
   }
 }
 

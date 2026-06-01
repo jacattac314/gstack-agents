@@ -258,11 +258,25 @@ Waiting to launch GStack local agents... Ready.
           <span class="empty-state">No files built in workspace yet.</span>
         </div>
 
-        <!-- Docked File Code Viewer -->
-        <div class="flex-col" style="flex-grow: 2; display: flex; flex-direction: column; min-height: 240px; margin-top: 8px;">
-          <h3 class="panel-title-sub" id="preview-file-title" style="margin-bottom: 8px;">File Code Viewer</h3>
-          <div class="code-viewer-container flex-grow-1" style="flex-grow: 1; display: flex;">
-            <pre class="code-viewer-body" id="preview-file-content" style="flex-grow: 1; margin: 0; padding: 12px; border-radius: 8px;">Select a file from the workspace above to inspect its code contents in real time.</pre>
+        <!-- Docked File Code Viewer & Live Preview Tabs -->
+        <div class="flex-col" style="flex-grow: 2; display: flex; flex-direction: column; min-height: 320px; margin-top: 8px;">
+          <div class="tab-header" style="display: flex; gap: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; margin-bottom: 8px;">
+            <button id="tab-code-btn" class="tab-btn active" style="background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-color); cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 500; font-size: 12px; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;">📄 Code</button>
+            <button id="tab-preview-btn" class="tab-btn" style="background: none; border: none; color: rgba(255, 255, 255, 0.6); cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 500; font-size: 12px; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;">🎮 Live Preview</button>
+          </div>
+          
+          <div id="tab-code-content" class="tab-content" style="display: flex; flex-grow: 1; min-height: 240px; flex-direction: column; width: 100%;">
+            <div class="code-viewer-container flex-grow-1" style="flex-grow: 1; display: flex; width: 100%;">
+              <pre class="code-viewer-body" id="preview-file-content" style="flex-grow: 1; margin: 0; padding: 12px; border-radius: 8px; width: 100%; overflow: auto;">Select a file from the workspace above to inspect its code contents in real time.</pre>
+            </div>
+          </div>
+          
+          <div id="tab-preview-content" class="tab-content" style="display: none; flex-grow: 1; min-height: 240px; flex-direction: column; width: 100%;">
+            <iframe id="live-preview-iframe" style="width: 100%; flex-grow: 1; min-height: 240px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; background: #fff;" src="about:blank"></iframe>
+            <div id="live-preview-status" style="font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;">URL: <span id="live-preview-url" style="color: rgba(255,255,255,0.75);">None</span></span>
+              <button id="live-preview-refresh" style="background: none; border: none; color: #80c0ff; cursor: pointer; text-decoration: underline; font-size: 11px; padding: 0;">Reload 🔄</button>
+            </div>
           </div>
         </div>
       </section>
