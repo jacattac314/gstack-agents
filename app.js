@@ -35,7 +35,7 @@ const freellmapiTokenInput = document.getElementById("freellmapi-token");
 const freellmapiModelSelect = document.getElementById("freellmapi-model-select");
 const providerSaveBtn = document.getElementById("provider-save-btn");
 const gridContainer = document.querySelector(".dashboard-grid");
-const pipelineNodes = document.querySelectorAll(".timeline-nodes .node");
+const pipelineNodes = document.querySelectorAll(".runway-viewport .node-3d");
 const terminalOutput = document.getElementById("terminal-output");
 const terminalName = document.getElementById("terminal-name");
 const terminalPulse = document.getElementById("terminal-pulse");
@@ -707,7 +707,41 @@ function updateUIState() {
       previewUrl.textContent = url;
       // Auto-switch to Live Preview tab to show the user the live progress!
       switchTab("preview");
+  }
+
+  // Update 3D Runway Text dynamically based on active sprint steps
+  const runwayOverlay = document.getElementById("runway-text-overlay");
+  if (runwayOverlay) {
+    let lines = [];
+    const phaseNames = ["think", "plan", "design", "build", "review", "test", "ship"];
+    const phaseDisplayNames = {
+      think: "CEO Agent brainstorms brief spec",
+      plan: "Eng Manager designs technical spec",
+      design: "Designer styles UI & layout",
+      build: "Coder Agent writes clean working code",
+      review: "Release Eng reviews the code",
+      test: "QA Lead runs verification tests",
+      ship: "Release Eng bundles & ships app"
+    };
+
+    let lineIndex = 1;
+    phaseNames.forEach(p => {
+      const pState = state.phases[p];
+      if (pState && (pState.status === "completed" || state.current_phase === p)) {
+        const isCurrent = state.current_phase === p;
+        const icon = pState.status === "completed" ? "✓" : "⚡";
+        const color = isCurrent ? "#fff" : "rgba(255,255,255,0.6)";
+        const weight = isCurrent ? "bold" : "normal";
+        lines.push(`<div class="runway-line" style="color: ${color}; font-weight: ${weight}; margin-bottom: 4px;">${lineIndex}. ${icon} <strong>${phaseDisplayNames[p]}</strong></div>`);
+        lineIndex++;
+      }
+    });
+
+    if (lines.length === 0) {
+      lines.push(`<div class="runway-line" style="color: rgba(255,255,255,0.55); font-style: italic;">Waiting to bootstrap engineering team agents... Ready.</div>`);
     }
+
+    runwayOverlay.innerHTML = lines.join("");
   }
 
   // Auto-follow: if the current phase changed, automatically focus terminal on the new active agent
@@ -746,7 +780,7 @@ function updateUIState() {
 
     const badgeEl = document.getElementById(`badge-${phase}`);
     if (badgeEl) {
-      badgeEl.className = "node-status-badge";
+      badgeEl.className = "node-3d-badge";
       badgeEl.innerHTML = "";
     }
 

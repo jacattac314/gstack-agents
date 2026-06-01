@@ -152,77 +152,82 @@
       <!-- COLUMN 2: Agent Terminal & Unified Pipeline -->
       <section class="grid-col flex-col glass-card panel-card" style="padding: 16px;">
         
-        <!-- Unified Clickable Pipeline Stepper -->
-        <div class="timeline-container" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 16px; margin-bottom: 12px; overflow-x: auto;">
-          <div class="timeline-nodes" style="min-width: 800px; display: flex; justify-content: space-between; align-items: center;">
+        <!-- Unified Clickable 3D AGI Perspective Runway -->
+        <div class="runway-viewport">
+          <div class="runway-title">AGI DEVELOPMENT WORKFLOW</div>
+          
+          <!-- Perspective Glass Runway -->
+          <div class="glass-runway">
+            <div class="runway-grid"></div>
+            <div class="runway-text-content" id="runway-text-overlay">
+              <div class="runway-line" style="color: rgba(255,255,255,0.55); font-style: italic;">Waiting to bootstrap engineering team agents... Ready.</div>
+            </div>
+          </div>
+          
+          <!-- 3D crescent arc of nodes -->
+          <div class="arc-nodes">
             
-            <div class="node active" data-agent="ceo" id="node-think">
-              <div class="node-icon-wrapper">
-                <div class="node-icon">🧠</div>
-                <div class="node-status-badge" id="badge-think"></div>
+            <div class="node-3d active" data-agent="ceo" id="node-think" style="left: 6%; bottom: 15%;">
+              <div class="node-3d-circle">
+                <span class="node-3d-emoji">🧠</span>
+                <div class="node-3d-badge" id="badge-think"></div>
               </div>
-              <div class="node-label">Think</div>
-              <div class="node-sub">CEO Agent</div>
+              <div class="node-3d-label">Think</div>
+              <div class="node-3d-sub">CEO Agent</div>
             </div>
-            <div class="timeline-connector"></div>
             
-            <div class="node" data-agent="eng_manager" id="node-plan">
-              <div class="node-icon-wrapper">
-                <div class="node-icon">📋</div>
-                <div class="node-status-badge" id="badge-plan"></div>
+            <div class="node-3d" data-agent="eng_manager" id="node-plan" style="left: 20%; bottom: 42%;">
+              <div class="node-3d-circle">
+                <span class="node-3d-emoji">📋</span>
+                <div class="node-3d-badge" id="badge-plan"></div>
               </div>
-              <div class="node-label">Plan</div>
-              <div class="node-sub">Eng Manager</div>
+              <div class="node-3d-label">Plan</div>
+              <div class="node-3d-sub">Eng Manager</div>
             </div>
-            <div class="timeline-connector"></div>
-
-            <div class="node" data-agent="designer" id="node-design">
-              <div class="node-icon-wrapper">
-                <div class="node-icon">🎨</div>
-                <div class="node-status-badge" id="badge-design"></div>
+            
+            <div class="node-3d" data-agent="designer" id="node-design" style="left: 34%; bottom: 62%;">
+              <div class="node-3d-circle">
+                <span class="node-3d-emoji">🎨</span>
+                <div class="node-3d-badge" id="badge-design"></div>
               </div>
-              <div class="node-label">Design</div>
-              <div class="node-sub">Designer</div>
+              <div class="node-3d-label">Design</div>
+              <div class="node-3d-sub">Designer</div>
             </div>
-            <div class="timeline-connector"></div>
-
-            <div class="node" data-agent="coder" id="node-build">
-              <div class="node-icon-wrapper">
-                <div class="node-icon">🔨</div>
-                <div class="node-status-badge" id="badge-build"></div>
+            
+            <div class="node-3d" data-agent="coder" id="node-build" style="right: 34%; bottom: 62%;">
+              <div class="node-3d-circle">
+                <span class="node-3d-emoji">🔨</span>
+                <div class="node-3d-badge" id="badge-build"></div>
               </div>
-              <div class="node-label">Build</div>
-              <div class="node-sub">Coder Agent</div>
+              <div class="node-3d-label">Build</div>
+              <div class="node-3d-sub">Coder Agent</div>
             </div>
-            <div class="timeline-connector"></div>
-
-            <div class="node" data-agent="release_engineer" id="node-review">
-              <div class="node-icon-wrapper">
-                <div class="node-icon">🔍</div>
-                <div class="node-status-badge" id="badge-review"></div>
+            
+            <div class="node-3d" data-agent="release_engineer" id="node-review" style="right: 20%; bottom: 42%;">
+              <div class="node-3d-circle">
+                <span class="node-3d-emoji">🔍</span>
+                <div class="node-3d-badge" id="badge-review"></div>
               </div>
-              <div class="node-label">Review</div>
-              <div class="node-sub">Release Eng</div>
+              <div class="node-3d-label">Review</div>
+              <div class="node-3d-sub">Release Eng</div>
             </div>
-            <div class="timeline-connector"></div>
 
-            <div class="node" data-agent="qa_lead" id="node-test">
-              <div class="node-icon-wrapper">
-                <div class="node-icon">🧪</div>
-                <div class="node-status-badge" id="badge-test"></div>
+            <div class="node-3d" data-agent="qa_lead" id="node-test" style="right: 6%; bottom: 15%;">
+              <div class="node-3d-circle">
+                <span class="node-3d-emoji">🧪</span>
+                <div class="node-3d-badge" id="badge-test"></div>
               </div>
-              <div class="node-label">Test</div>
-              <div class="node-sub">QA Lead</div>
+              <div class="node-3d-label">Test</div>
+              <div class="node-3d-sub">QA Lead</div>
             </div>
-            <div class="timeline-connector"></div>
 
-            <div class="node" data-agent="release_engineer" id="node-ship">
-              <div class="node-icon-wrapper">
-                <div class="node-icon">🚀</div>
-                <div class="node-status-badge" id="badge-ship"></div>
+            <div class="node-3d" data-agent="release_engineer" id="node-ship" style="left: 50%; bottom: 74%; transform: translateX(-50%);">
+              <div class="node-3d-circle">
+                <span class="node-3d-emoji">🚀</span>
+                <div class="node-3d-badge" id="badge-ship"></div>
               </div>
-              <div class="node-label">Ship</div>
-              <div class="node-sub">Release Eng</div>
+              <div class="node-3d-label">Ship</div>
+              <div class="node-3d-sub">Release Eng</div>
             </div>
             
           </div>

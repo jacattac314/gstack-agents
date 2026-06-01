@@ -1,6 +1,6 @@
 {
   "build": {
-    "distDir": "../",
+    "distDir": "../dist-web",
     "devPath": "http://localhost:8000",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""

@@ -30,12 +30,19 @@ fn main() {
         }
       });
 
-      // Bind callback to cleanly kill sidecar on application destruction
+      // Bind callback to cleanly kill sidecar on application destruction using Arc<Mutex> wrapper
+      let child_shared = std::sync::Arc::new(std::sync::Mutex::new(Some(child)));
+      let child_clone = child_shared.clone();
+      
       let app_handle = app.handle();
       app_handle.listen_global("tauri://destroyed", move |_| {
         println!("Tauri shell closing, killing backend sidecar child process... 🛑");
-        child.kill().expect("Failed to terminate sidecar process cleanly");
-        println!("Sidecar process terminated!");
+        if let Ok(mut guard) = child_clone.lock() {
+          if let Some(c) = guard.take() {
+            c.kill().expect("Failed to terminate sidecar process cleanly");
+            println!("Sidecar process terminated!");
+          }
+        }
       });
 
       Ok(())
