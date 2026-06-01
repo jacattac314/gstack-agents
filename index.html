@@ -81,6 +81,26 @@
           </div>
         </div>
 
+        <!-- LLM Provider Config -->
+        <div class="glass-card panel-card padding-lg">
+          <h2 class="panel-title">LLM Provider Config</h2>
+          <p class="panel-desc">Select the LLM intelligence engine to power your agent sprints.</p>
+          <div class="flex-col gap-sm margin-top-md">
+            <select id="provider-select" class="premium-select">
+              <option value="lm_studio">💻 LM Studio (Local Offline)</option>
+              <option value="freellmapi">🔗 FreeLLMAPI Proxy</option>
+            </select>
+            
+            <div id="freellmapi-config-section" class="flex-col gap-sm margin-top-sm" style="display:none;">
+              <input type="text" id="freellmapi-url" class="premium-input" placeholder="Proxy Base URL (e.g. http://localhost:3001/v1)">
+              <input type="password" id="freellmapi-token" class="premium-input" placeholder="API Unified Key (freellmapi-...)">
+              <input type="text" id="freellmapi-model" class="premium-input" placeholder="Target Model (e.g. google/gemini-2.5-flash)">
+            </div>
+            
+            <button id="provider-save-btn" class="glow-button secondary" style="margin-top:8px;">Save LLM Config 💾</button>
+          </div>
+        </div>
+
         <!-- Sprint Composer -->
         <div class="glass-card panel-card padding-lg">
           <h2 class="panel-title">Sprint Composer</h2>

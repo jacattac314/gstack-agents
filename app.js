@@ -27,6 +27,13 @@ const composerTextarea = document.getElementById("composer-textarea");
 const sprintActionBtn = document.getElementById("sprint-action-btn");
 const sprintLaunchAppBtn = document.getElementById("sprint-launch-app-btn");
 const drawerToggleBtn = document.getElementById("drawer-toggle-btn");
+
+const providerSelect = document.getElementById("provider-select");
+const freellmapiConfigSection = document.getElementById("freellmapi-config-section");
+const freellmapiUrlInput = document.getElementById("freellmapi-url");
+const freellmapiTokenInput = document.getElementById("freellmapi-token");
+const freellmapiModelInput = document.getElementById("freellmapi-model");
+const providerSaveBtn = document.getElementById("provider-save-btn");
 const gridContainer = document.querySelector(".dashboard-grid");
 const pipelineNodes = document.querySelectorAll(".timeline-nodes .node");
 const terminalOutput = document.getElementById("terminal-output");
@@ -76,6 +83,7 @@ async function initializeDashboard() {
   // Initial loads
   fetchGitHubStatus();
   fetchWorkspaceFiles();
+  fetchProviderConfig();
 }
 
 // --------------------------------------------------------------------
@@ -190,6 +198,78 @@ function setupEventListeners() {
 
   // Handle typing inside the repository search bar for smart filtering
   githubRepoSearch.addEventListener("input", filterUserRepositories);
+
+  // LLM Provider Dropdown change
+  providerSelect.addEventListener("change", toggleProviderConfigFields);
+  
+  // Save LLM config button click
+  providerSaveBtn.addEventListener("click", saveLLMProviderConfig);
+}
+
+function toggleProviderConfigFields() {
+  const provider = providerSelect.value;
+  if (provider === "freellmapi") {
+    freellmapiConfigSection.style.display = "flex";
+  } else {
+    freellmapiConfigSection.style.display = "none";
+  }
+}
+
+async function fetchProviderConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/config/provider?_=${Date.now()}`);
+    const data = await res.json();
+    if (data) {
+      providerSelect.value = data.provider || "lm_studio";
+      freellmapiUrlInput.value = data.freellmapi_url || "http://localhost:3001/v1";
+      freellmapiTokenInput.value = data.freellmapi_token || "";
+      freellmapiModelInput.value = data.freellmapi_model || "google/gemini-2.5-flash";
+      toggleProviderConfigFields();
+    }
+  } catch (e) {
+    console.error("Failed to fetch provider configuration:", e);
+  }
+}
+
+async function saveLLMProviderConfig() {
+  const provider = providerSelect.value;
+  const url = freellmapiUrlInput.value.trim();
+  const token = freellmapiTokenInput.value.trim();
+  const model = freellmapiModelInput.value.trim();
+  
+  providerSaveBtn.disabled = true;
+  providerSaveBtn.textContent = "Saving... 💾";
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/config/provider?_=${Date.now()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider,
+        freellmapi_url: url,
+        freellmapi_token: token,
+        freellmapi_model: model
+      })
+    });
+    const data = await res.json();
+    
+    if (data.status === "success") {
+      alert("LLM Provider Configuration saved successfully!");
+      // Instantly refresh model name badge
+      const modelRes = await fetch(`${API_BASE}/api/models?_=${Date.now()}`);
+      const modelData = await modelRes.json();
+      if (modelData.active_model) {
+        activeModelEl.textContent = modelData.active_model.split("/").pop();
+      }
+    } else {
+      alert(`Failed to save configuration: ${data.message}`);
+    }
+  } catch (e) {
+    alert(`Error communicating with FastAPI server: ${e}`);
+  } finally {
+    providerSaveBtn.disabled = false;
+    providerSaveBtn.textContent = "Save LLM Config 💾";
+  }
 }
 
 // --------------------------------------------------------------------

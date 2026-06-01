@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from gstack_core import GStackSprintOrchestrator, resolve_local_model, BASE_DIR, LOGS_DIR, WORKSPACE_DIR
+from gstack_core import GStackSprintOrchestrator, resolve_local_model, load_provider_config, save_provider_config, BASE_DIR, LOGS_DIR, WORKSPACE_DIR
 
 app = FastAPI(
     title="GStack Agents Local gateway Console",
@@ -496,8 +496,41 @@ async def api_workspace_file(path: str = Query(..., description="Filename to rea
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/config/provider")
+async def api_get_provider_config():
+    """Serves the active intelligence provider configuration."""
+    try:
+        return load_provider_config()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/config/provider")
+async def api_post_provider_config(payload: dict):
+    """Updates the intelligence provider configuration."""
+    try:
+        provider = payload.get("provider", "lm_studio")
+        freellmapi_url = payload.get("freellmapi_url", "http://localhost:3001/v1")
+        freellmapi_token = payload.get("freellmapi_token", "")
+        freellmapi_model = payload.get("freellmapi_model", "google/gemini-2.5-flash")
+        
+        config = {
+            "provider": provider,
+            "freellmapi_url": freellmapi_url,
+            "freellmapi_token": freellmapi_token,
+            "freellmapi_model": freellmapi_model
+        }
+        
+        save_provider_config(config)
+        return {"status": "success", "message": "Provider configuration updated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/models")
 async def api_models():
+    config = load_provider_config()
+    if config.get("provider") == "freellmapi":
+        model_name = "FreeLLMAPI: " + config.get("freellmapi_model", "google/gemini-2.5-flash")
+        return {"active_model": model_name}
     return {"active_model": resolve_local_model()}
 
 if __name__ == "__main__":

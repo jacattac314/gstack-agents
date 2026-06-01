@@ -12,11 +12,38 @@ BASE_DIR = "/Users/jack/Documents/gstack-agents"
 WORKSPACE_DIR = os.path.join(BASE_DIR, "workspace")
 SKILLS_DIR = os.path.join(BASE_DIR, "skills")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
+PROVIDER_CONFIG_PATH = os.path.join(LOGS_DIR, "provider_config.json")
 
 # Ensure folders exist
 os.makedirs(WORKSPACE_DIR, exist_ok=True)
 os.makedirs(SKILLS_DIR, exist_ok=True)
 os.makedirs(LOGS_DIR, exist_ok=True)
+
+def load_provider_config() -> dict:
+    default_config = {
+        "provider": "lm_studio",
+        "freellmapi_url": "http://localhost:3001/v1",
+        "freellmapi_token": "",
+        "freellmapi_model": "google/gemini-2.5-flash"
+    }
+    if os.path.exists(PROVIDER_CONFIG_PATH):
+        try:
+            with open(PROVIDER_CONFIG_PATH, "r") as f:
+                config = json.load(f)
+                for k, v in default_config.items():
+                    if k not in config:
+                        config[k] = v
+                return config
+        except Exception:
+            pass
+    return default_config
+
+def save_provider_config(config: dict):
+    try:
+        with open(PROVIDER_CONFIG_PATH, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        print(f"Error saving provider config: {e}")
 
 # --------------------------------------------------------------------
 # 1. Model Resolver (Defensive local model selection)
@@ -51,10 +78,22 @@ def resolve_local_model() -> str:
 # 2. Local Model Request Client (Httpx/Urllib zero-dependency client)
 # --------------------------------------------------------------------
 async def chat_local_model(system_prompt: str, user_prompt: str, log_file_path: str = None) -> str:
-    """Hits the local LM Studio OpenAI endpoint with real-time stream logging."""
-    model = resolve_local_model()
-    url = "http://localhost:1234/v1/chat/completions"
+    """Hits the configured LLM endpoint (LM Studio or FreeLLMAPI) with real-time stream logging."""
+    config = load_provider_config()
+    headers = {"Content-Type": "application/json"}
     
+    if config.get("provider") == "freellmapi":
+        base_url = config.get("freellmapi_url", "http://localhost:3001/v1").rstrip("/")
+        url = f"{base_url}/chat/completions"
+        model = config.get("freellmapi_model", "google/gemini-2.5-flash")
+        token = config.get("freellmapi_token", "").strip()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    else:
+        # Default: LM Studio
+        model = resolve_local_model()
+        url = "http://localhost:1234/v1/chat/completions"
+        
     payload = {
         "model": model,
         "messages": [
@@ -69,7 +108,7 @@ async def chat_local_model(system_prompt: str, user_prompt: str, log_file_path: 
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST"
     )
     
@@ -295,7 +334,11 @@ class GStackSprintOrchestrator:
                     self.state = json.load(f)
             except Exception:
                 pass
-        self.state["metrics"]["active_model"] = resolve_local_model()
+        config = load_provider_config()
+        if config.get("provider") == "freellmapi":
+            self.state["metrics"]["active_model"] = "FreeLLMAPI: " + config.get("freellmapi_model", "google/gemini-2.5-flash")
+        else:
+            self.state["metrics"]["active_model"] = resolve_local_model()
         self.save_state()
 
     def save_state(self):
