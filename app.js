@@ -1535,7 +1535,7 @@ async function handleResetDashboard() {
     });
     const data = await res.json();
     
-    if (data.status === "success") {
+    if (res.ok && data && data.status === "success") {
       // 1. Reset client-side state variables
       composerTextarea.value = "";
       activeFile = null;
@@ -1577,7 +1577,8 @@ async function handleResetDashboard() {
       
       alert("GStack workspace successfully reset back to original state!");
     } else {
-      alert(`Failed to reset dashboard: ${data.message}`);
+      const errMsg = (data && (data.message || data.detail)) || `HTTP error ${res.status}`;
+      alert(`Failed to reset dashboard: ${errMsg}`);
     }
   } catch (e) {
     alert(`Network error resetting dashboard: ${e}`);
