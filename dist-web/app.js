@@ -164,6 +164,19 @@ const githubPatToken = document.getElementById("github-pat-token");
 const githubSyncSection = document.getElementById("github-sync-section");
 const githubDivider = document.getElementById("github-divider");
 
+function formatModelBadgeText(modelStr) {
+  if (!modelStr) return "Not Configured";
+  const parts = modelStr.split("/");
+  const leafModel = parts[parts.length - 1];
+  if (leafModel.includes(":")) {
+    const subparts = leafModel.split(":");
+    const provider = subparts[0].trim();
+    const modelName = subparts.slice(1).join(":").trim();
+    return `${modelName} (${provider})`;
+  }
+  return leafModel;
+}
+
 // --------------------------------------------------------------------
 // 1. Initial Handshake & Setup
 // --------------------------------------------------------------------
@@ -172,7 +185,7 @@ async function initializeDashboard() {
     const res = await fetch(`${API_BASE}/api/models?_=${Date.now()}`);
     const data = await res.json();
     if (data.active_model) {
-      activeModelEl.textContent = data.active_model.split("/").pop();
+      activeModelEl.textContent = formatModelBadgeText(data.active_model);
     }
   } catch (e) {
     activeModelEl.textContent = "Offline (Check Server)";
@@ -185,6 +198,7 @@ async function initializeDashboard() {
   fetchGitHubStatus();
   fetchWorkspaceFiles();
   fetchProviderConfig();
+  fetchWebhookConfig();
 }
 
 // --------------------------------------------------------------------
@@ -247,16 +261,33 @@ function filterUserRepositories() {
 
 function toggleSyncActionFields() {
   const action = githubSyncAction.value;
+  const searchEl = document.getElementById("github-repo-search");
+  const searchLabel = document.getElementById("github-repo-search-label");
+  const selectEl = document.getElementById("github-repo-select");
+  const selectLabel = document.getElementById("github-repo-select-label");
+  const nameEl = document.getElementById("github-repo-name");
+  const nameLabel = document.getElementById("github-repo-name-label");
+  const descEl = document.getElementById("github-repo-desc");
+  const descLabel = document.getElementById("github-repo-desc-label");
+
   if (action === "connect") {
-    githubRepoSearch.style.display = "block";
-    githubRepoSelect.style.display = "block";
-    githubRepoName.style.display = "none";
-    githubRepoDesc.style.display = "none";
+    if (searchEl) searchEl.style.display = "block";
+    if (searchLabel) searchLabel.style.display = "block";
+    if (selectEl) selectEl.style.display = "block";
+    if (selectLabel) selectLabel.style.display = "block";
+    if (nameEl) nameEl.style.display = "none";
+    if (nameLabel) nameLabel.style.display = "none";
+    if (descEl) descEl.style.display = "none";
+    if (descLabel) descLabel.style.display = "none";
   } else {
-    githubRepoSearch.style.display = "none";
-    githubRepoSelect.style.display = "none";
-    githubRepoName.style.display = "block";
-    githubRepoDesc.style.display = "block";
+    if (searchEl) searchEl.style.display = "none";
+    if (searchLabel) searchLabel.style.display = "none";
+    if (selectEl) selectEl.style.display = "none";
+    if (selectLabel) selectLabel.style.display = "none";
+    if (nameEl) nameEl.style.display = "block";
+    if (nameLabel) nameLabel.style.display = "block";
+    if (descEl) descEl.style.display = "block";
+    if (descLabel) descLabel.style.display = "block";
   }
 }
 
@@ -316,7 +347,7 @@ function setupEventListeners() {
 
   // Dynamic model loading when URL or Token is updated
   const refreshModelsList = () => {
-    if (providerSelect.value === "freellmapi") {
+    if (providerSelect.value === "freellmapi" || providerSelect.value === "cloud_first") {
       fetchFreeLLMAPIModels(
         freellmapiModelSelect.value || null,
         freellmapiUrlInput.value.trim() || null,
@@ -352,11 +383,92 @@ function setupEventListeners() {
       }
     });
   }
+
+  // GitHub panel toggle
+  const githubPanelHeader = document.getElementById("github-panel-header");
+  const githubPanelBody = document.getElementById("github-panel-body");
+  const githubToggleIcon = document.getElementById("github-toggle-icon");
+  if (githubPanelHeader && githubPanelBody && githubToggleIcon) {
+    githubPanelHeader.addEventListener("click", () => {
+      const isHidden = githubPanelBody.style.display === "none";
+      githubPanelBody.style.display = isHidden ? "block" : "none";
+      githubToggleIcon.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+    });
+  }
+
+  // Provider panel toggle
+  const providerPanelHeader = document.getElementById("provider-panel-header");
+  const providerPanelBody = document.getElementById("provider-panel-body");
+  const providerToggleIcon = document.getElementById("provider-toggle-icon");
+  if (providerPanelHeader && providerPanelBody && providerToggleIcon) {
+    providerPanelHeader.addEventListener("click", () => {
+      const isHidden = providerPanelBody.style.display === "none";
+      providerPanelBody.style.display = isHidden ? "flex" : "none";
+      providerToggleIcon.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+    });
+  }
+
+  // Webhook Configuration panel toggle
+  const webhookPanelHeader = document.getElementById("webhook-panel-header");
+  const webhookPanelBody = document.getElementById("webhook-panel-body");
+  const webhookToggleIcon = document.getElementById("webhook-toggle-icon");
+  if (webhookPanelHeader && webhookPanelBody && webhookToggleIcon) {
+    webhookPanelHeader.addEventListener("click", () => {
+      const isHidden = webhookPanelBody.style.display === "none";
+      webhookPanelBody.style.display = isHidden ? "flex" : "none";
+      webhookToggleIcon.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+    });
+  }
+
+  // Webhook save button
+  const webhookSaveBtn = document.getElementById("webhook-save-btn");
+  if (webhookSaveBtn) {
+    webhookSaveBtn.addEventListener("click", saveWebhookConfig);
+  }
+
+  // HITL Modal buttons
+  const hitlApproveBtn = document.getElementById("hitl-approve-btn");
+  const hitlRejectBtn = document.getElementById("hitl-reject-btn");
+  if (hitlApproveBtn && hitlRejectBtn) {
+    hitlApproveBtn.addEventListener("click", handleHITLApprove);
+    hitlRejectBtn.addEventListener("click", handleHITLReject);
+  }
+
+  // GitHub PAT password reveal
+  const githubRevealBtn = document.getElementById("github-reveal-btn");
+  const githubPatToken = document.getElementById("github-pat-token");
+  if (githubRevealBtn && githubPatToken) {
+    githubRevealBtn.addEventListener("click", () => {
+      const isPassword = githubPatToken.type === "password";
+      githubPatToken.type = isPassword ? "text" : "password";
+      githubRevealBtn.textContent = isPassword ? "Hide" : "Show";
+    });
+  }
+
+  // FreeLLMAPI Key password reveal
+  const freellmapiRevealBtn = document.getElementById("freellmapi-reveal-btn");
+  const freellmapiToken = document.getElementById("freellmapi-token");
+  if (freellmapiRevealBtn && freellmapiToken) {
+    freellmapiRevealBtn.addEventListener("click", () => {
+      const isPassword = freellmapiToken.type === "password";
+      freellmapiToken.type = isPassword ? "text" : "password";
+      freellmapiRevealBtn.textContent = isPassword ? "Hide" : "Show";
+    });
+  }
+
+  // FreeLLMAPI Models search filter
+  const freellmapiModelSearch = document.getElementById("freellmapi-model-search");
+  if (freellmapiModelSearch) {
+    freellmapiModelSearch.addEventListener("input", () => {
+      const query = freellmapiModelSearch.value.trim().toLowerCase();
+      filterGroupedModels(query, freellmapiModelSelect.value);
+    });
+  }
 }
 
 function toggleProviderConfigFields() {
   const provider = providerSelect.value;
-  if (provider === "freellmapi") {
+  if (provider === "freellmapi" || provider === "cloud_first") {
     freellmapiConfigSection.style.display = "flex";
     // Fetch models automatically if provider is active
     fetchFreeLLMAPIModels(
@@ -366,6 +478,55 @@ function toggleProviderConfigFields() {
     );
   } else {
     freellmapiConfigSection.style.display = "none";
+  }
+}
+
+let fetchedModels = [];
+
+function filterGroupedModels(query = "", selectedModel = null) {
+  // Clear previous options
+  freellmapiModelSelect.replaceChildren();
+
+  const groups = {};
+  fetchedModels.forEach(model => {
+    const matchesQuery = !query || 
+      model.id.toLowerCase().includes(query) || 
+      (model.name && model.name.toLowerCase().includes(query));
+      
+    if (matchesQuery) {
+      const provider = model.owned_by || "Other Providers";
+      const formattedProvider = provider.charAt(0).toUpperCase() + provider.slice(1);
+      if (!groups[formattedProvider]) {
+        groups[formattedProvider] = [];
+      }
+      groups[formattedProvider].push(model);
+    }
+  });
+
+  for (const [provider, models] of Object.entries(groups)) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = provider;
+    models.forEach(model => {
+      const nameLabel = model.name ? model.name : model.id;
+      const opt = createOption(model.id, nameLabel);
+      optgroup.appendChild(opt);
+    });
+    freellmapiModelSelect.appendChild(optgroup);
+  }
+
+  if (Object.keys(groups).length === 0) {
+    replaceSelectOptions(freellmapiModelSelect, [createOption("", "No matching models found")]);
+  } else if (selectedModel) {
+    // Attempt to set the selected model
+    const exactMatch = fetchedModels.some(m => m.id === selectedModel);
+    if (exactMatch) {
+      freellmapiModelSelect.value = selectedModel;
+    } else {
+      const flexibleMatch = fetchedModels.find(m => m.id.endsWith('/' + selectedModel) || selectedModel.endsWith('/' + m.id));
+      if (flexibleMatch) {
+        freellmapiModelSelect.value = flexibleMatch.id;
+      }
+    }
   }
 }
 
@@ -383,28 +544,19 @@ async function fetchFreeLLMAPIModels(selectedModel = null, url = null, token = n
     const data = await res.json();
     
     if (data && data.data) {
-      const options = data.data.map(model => {
-        const nameLabel = model.name ? `${model.name} (${model.owned_by || 'proxy'})` : model.id;
-        return createOption(model.id, nameLabel);
-      });
-      replaceSelectOptions(freellmapiModelSelect, options);
+      fetchedModels = data.data;
+      filterGroupedModels("", selectedModel);
       
-      if (selectedModel) {
+      // If selectedModel is still not set correctly, append it as a safe fallback option
+      if (selectedModel && freellmapiModelSelect.value !== selectedModel) {
         const exactMatch = data.data.some(m => m.id === selectedModel);
-        if (exactMatch) {
+        const flexibleMatch = data.data.find(m => m.id.endsWith('/' + selectedModel) || selectedModel.endsWith('/' + m.id));
+        if (!exactMatch && !flexibleMatch) {
+          const opt = document.createElement("option");
+          opt.value = selectedModel;
+          opt.textContent = `${selectedModel} (current)`;
+          freellmapiModelSelect.appendChild(opt);
           freellmapiModelSelect.value = selectedModel;
-        } else {
-          const flexibleMatch = data.data.find(m => m.id.endsWith('/' + selectedModel) || selectedModel.endsWith('/' + m.id));
-          if (flexibleMatch) {
-            freellmapiModelSelect.value = flexibleMatch.id;
-          } else {
-            // Append as fallback option to ensure it's selected and not lost
-            const opt = document.createElement("option");
-            opt.value = selectedModel;
-            opt.textContent = `${selectedModel} (current)`;
-            freellmapiModelSelect.appendChild(opt);
-            freellmapiModelSelect.value = selectedModel;
-          }
         }
       }
     } else {
@@ -442,7 +594,7 @@ async function saveLLMProviderConfig() {
   const model = freellmapiModelSelect.value;
   
   providerSaveBtn.disabled = true;
-  providerSaveBtn.textContent = "Saving... 💾";
+  updateButtonState(providerSaveBtn, "Saving... 💾", "save");
   
   try {
     const res = await fetch(`${API_BASE}/api/config/provider?_=${Date.now()}`, {
@@ -463,7 +615,7 @@ async function saveLLMProviderConfig() {
       const modelRes = await fetch(`${API_BASE}/api/models?_=${Date.now()}`);
       const modelData = await modelRes.json();
       if (modelData.active_model) {
-        activeModelEl.textContent = modelData.active_model.split("/").pop();
+        activeModelEl.textContent = formatModelBadgeText(modelData.active_model);
       }
     } else {
       alert(`Failed to save configuration: ${data.message}`);
@@ -472,7 +624,7 @@ async function saveLLMProviderConfig() {
     alert(`Error communicating with FastAPI server: ${e}`);
   } finally {
     providerSaveBtn.disabled = false;
-    providerSaveBtn.textContent = "Save LLM Config 💾";
+    updateButtonState(providerSaveBtn, "Save LLM Config 💾", "save");
   }
 }
 
@@ -509,7 +661,7 @@ async function launchSprint() {
   updateUIState();
 
   sprintActionBtn.disabled = true;
-  sprintActionBtn.textContent = "Orchestrating... ⚡";
+  updateSprintButtonState("Orchestrating... ⚡");
   
   terminalOutput.textContent = "🚀 Launching sprint. Bootstrapping YC-style gStack team agents...\n";
 
@@ -528,12 +680,12 @@ async function launchSprint() {
     } else {
       alert(`Error starting sprint: ${data.message}`);
       sprintActionBtn.disabled = false;
-      sprintActionBtn.textContent = "Launch Sprint ⚡";
+      updateSprintButtonState("Launch Sprint ⚡");
     }
   } catch (e) {
     alert(`Failed to contact FastAPI server: ${e}`);
     sprintActionBtn.disabled = false;
-    sprintActionBtn.textContent = "Launch Sprint ⚡";
+    updateSprintButtonState("Launch Sprint ⚡");
   }
 }
 
@@ -549,7 +701,7 @@ async function loginGitHub() {
   }
 
   githubLoginBtn.disabled = true;
-  githubLoginBtn.textContent = "Authenticating... ⚡";
+  updateButtonState(githubLoginBtn, "Authenticating... ⚡", "key");
   githubFeedback.textContent = "Verifying token credentials...";
   githubFeedback.style.color = "var(--color-yellow)";
 
@@ -577,7 +729,7 @@ async function loginGitHub() {
     githubFeedback.style.color = "var(--color-red)";
   } finally {
     githubLoginBtn.disabled = false;
-    githubLoginBtn.textContent = "Link GitHub Token 🔑";
+    updateButtonState(githubLoginBtn, "Link GitHub Token 🔑", "key");
   }
 }
 
@@ -600,7 +752,7 @@ async function syncGitHubProject() {
   }
 
   githubSyncBtn.disabled = true;
-  githubSyncBtn.textContent = "Syncing... ⚡";
+  updateButtonState(githubSyncBtn, "Syncing... ⚡", "sync");
   githubFeedback.textContent = "Communicating with GitHub API gateway...";
   githubFeedback.style.color = "var(--color-yellow)";
 
@@ -646,7 +798,7 @@ async function syncGitHubProject() {
     githubFeedback.style.color = "var(--color-red)";
   } finally {
     githubSyncBtn.disabled = false;
-    githubSyncBtn.textContent = "Sync GitHub Project ⚡";
+    updateButtonState(githubSyncBtn, "Sync GitHub Project ⚡", "sync");
   }
 }
 
@@ -720,6 +872,8 @@ function startPollers() {
   pollers.push(setInterval(fetchWorkspaceFiles, 2000));
   // Poll GitHub authentication status
   pollers.push(setInterval(fetchGitHubStatus, 5000));
+  // Poll HITL Command approvals status
+  pollers.push(setInterval(checkHITLApproval, 1000));
 }
 
 async function fetchSprintStatus() {
@@ -767,23 +921,23 @@ function updateUIState() {
   metricSavings.textContent = `$${(state.metrics.accumulated_savings || 0).toFixed(2)}`;
 
   if (state.metrics.active_model) {
-    activeModelEl.textContent = state.metrics.active_model.split("/").pop();
+    activeModelEl.textContent = formatModelBadgeText(state.metrics.active_model);
   }
 
   // 2. Sprint Action Toggle Button State
   if (state.current_phase === "idle" || state.current_phase === "completed" || state.current_phase === "cancelled") {
     sprintActionBtn.disabled = false;
     sprintActionBtn.className = "glow-button";
-    sprintActionBtn.textContent = "Launch Sprint ⚡";
+    updateSprintButtonState("Launch Sprint ⚡");
     terminalPulse.style.display = "none";
   } else {
     // Keep it disabled if it is currently in "Stopping" state to prevent duplicate stop requests
-    if (sprintActionBtn.textContent === "Stopping... 🛑") {
+    if (sprintActionBtn.textContent.includes("Stopping")) {
       sprintActionBtn.disabled = true;
     } else {
       sprintActionBtn.disabled = false;
       sprintActionBtn.className = "glow-button red";
-      sprintActionBtn.textContent = "Stop Sprint 🛑";
+      updateSprintButtonState("Stop Sprint 🛑");
     }
     terminalPulse.style.display = "block";
   }
@@ -1021,6 +1175,48 @@ async function inspectFile(filename) {
 // Make inspectFile globally accessible
 window.inspectFile = inspectFile;
 
+// Helper to update utility buttons text and inline SVG icons dynamically
+function updateButtonState(btnEl, text, iconType) {
+  if (!btnEl) return;
+  
+  let svgMarkup = "";
+  if (iconType === "key") {
+    svgMarkup = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; flex-shrink: 0; margin-right: 8px;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>`;
+  } else if (iconType === "sync") {
+    svgMarkup = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; flex-shrink: 0; margin-right: 8px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`;
+  } else if (iconType === "save") {
+    svgMarkup = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; flex-shrink: 0; margin-right: 8px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+  }
+  
+  const cleanText = text.replace(/[🔑⚡💾]/g, "").trim();
+  btnEl.innerHTML = `${svgMarkup}<span>${cleanText}</span>`;
+}
+
+// Helper to update sprint button text and inline SVG icons dynamically
+function updateSprintButtonState(text) {
+  const sprintActionBtn = document.getElementById("sprint-action-btn");
+  if (!sprintActionBtn) return;
+
+  let iconType = "bolt";
+  if (text.includes("Stop") || text.includes("Stopping")) {
+    iconType = "stop";
+  }
+  
+  let svgMarkup = "";
+  if (iconType === "bolt") {
+    const isPulsing = text.includes("Orchestrating");
+    const pulsingStyle = isPulsing ? ' style="animation: pulse 1.5s infinite;"' : '';
+    svgMarkup = `<svg class="btn-icon-svg"${pulsingStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; flex-shrink: 0; margin-right: 8px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+  } else if (iconType === "stop") {
+    const isPulsing = text.includes("Stopping");
+    const pulsingStyle = isPulsing ? ' style="animation: pulse 1.5s infinite;"' : '';
+    svgMarkup = `<svg class="btn-icon-svg"${pulsingStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; flex-shrink: 0; margin-right: 8px;"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/></svg>`;
+  }
+  
+  const cleanText = text.replace(/[⚡🛑]/g, "").trim();
+  sprintActionBtn.innerHTML = `${svgMarkup}<span>${cleanText}</span>`;
+}
+
 // --------------------------------------------------------------------
 // 7. SVG Latency Chart Sparkline Render
 // --------------------------------------------------------------------
@@ -1038,18 +1234,29 @@ function renderLatencyChart(history) {
 
   svgPlaceholder.style.display = "none";
 
-  const padding = 15;
+  const paddingLeft = 35;
+  const paddingRight = 15;
+  const paddingTop = 15;
+  const paddingBottom = 20;
   const chartWidth = 300;
   const chartHeight = 120;
-  const drawWidth = chartWidth - padding * 2;
-  const drawHeight = chartHeight - padding * 2;
+  const drawWidth = chartWidth - paddingLeft - paddingRight; // 250
+  const drawHeight = chartHeight - paddingTop - paddingBottom; // 85
 
   const pointsCount = history.length;
   const maxVal = Math.max(...history.map(d => d.duration), 10); // Minimum scale floor of 10s
 
+  // Set dynamic Y labels
+  const labelTop = document.getElementById("chart-y-top");
+  const labelMid = document.getElementById("chart-y-mid");
+  if (labelTop && labelMid) {
+    labelTop.textContent = `${Math.round(maxVal)}s`;
+    labelMid.textContent = `${Math.round(maxVal / 2)}s`;
+  }
+
   const points = history.map((item, idx) => {
-    const x = padding + (idx / Math.max(pointsCount - 1, 1)) * drawWidth;
-    const y = padding + drawHeight - (item.duration / maxVal) * drawHeight;
+    const x = paddingLeft + (idx / Math.max(pointsCount - 1, 1)) * drawWidth;
+    const y = paddingTop + drawHeight - (item.duration / maxVal) * drawHeight;
     return { x, y };
   });
 
@@ -1061,7 +1268,7 @@ function renderLatencyChart(history) {
   pathEl.setAttribute("d", d);
 
   // Build enclosed SVG Area Path string
-  let dArea = `${d} L ${points[points.length - 1].x} ${chartHeight - padding} L ${points[0].x} ${chartHeight - padding} Z`;
+  let dArea = `${d} L ${points[points.length - 1].x} ${chartHeight - paddingBottom} L ${points[0].x} ${chartHeight - paddingBottom} Z`;
   areaEl.setAttribute("d", dArea);
 }
 
@@ -1079,7 +1286,7 @@ async function stopSprint() {
   }
   
   sprintActionBtn.disabled = true;
-  sprintActionBtn.textContent = "Stopping... 🛑";
+  updateSprintButtonState("Stopping... 🛑");
   
   try {
     const res = await fetch(`${API_BASE}/api/sprint/stop?_=${Date.now()}`, {
@@ -1092,12 +1299,12 @@ async function stopSprint() {
     } else {
       alert(`Error stopping sprint: ${data.message}`);
       sprintActionBtn.disabled = false;
-      sprintActionBtn.textContent = "Stop Sprint 🛑";
+      updateSprintButtonState("Stop Sprint 🛑");
     }
   } catch (e) {
     alert(`Failed to contact FastAPI server: ${e}`);
     sprintActionBtn.disabled = false;
-    sprintActionBtn.textContent = "Stop Sprint 🛑";
+    updateSprintButtonState("Stop Sprint 🛑");
   }
 }
 
@@ -1131,6 +1338,115 @@ function switchTab(tabName) {
     
     tabPreviewContent.style.display = "flex";
     tabCodeContent.style.display = "none";
+  }
+}
+
+// --------------------------------------------------------------------
+// 8. Human-in-the-Loop & Webhooks Dynamic Controllers
+// --------------------------------------------------------------------
+async function checkHITLApproval() {
+  try {
+    const res = await fetch(`${API_BASE}/api/sprint/approval?_=${Date.now()}`);
+    const data = await res.json();
+    const modal = document.getElementById("hitl-modal");
+    const cmdText = document.getElementById("hitl-command-text");
+    const agentText = document.getElementById("hitl-agent-name");
+    
+    if (data && data.approval_status === "waiting_for_approval") {
+      cmdText.textContent = data.requested_command || "No command requested";
+      if (agentText) {
+        agentText.textContent = data.requesting_agent || "Release Engineer";
+      }
+      if (!modal.classList.contains("show")) {
+        modal.classList.add("show");
+      }
+    } else {
+      modal.classList.remove("show");
+    }
+  } catch (e) {
+    console.error("Error checking HITL approval:", e);
+  }
+}
+
+async function handleHITLApprove() {
+  const btn = document.getElementById("hitl-approve-btn");
+  btn.disabled = true;
+  btn.textContent = "Approving... ⏳";
+  try {
+    const res = await fetch(`${API_BASE}/api/sprint/approve?_=${Date.now()}`, {
+      method: "POST"
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      document.getElementById("hitl-modal").classList.remove("show");
+    } else {
+      alert(`Approval failed: ${data.message}`);
+    }
+  } catch (e) {
+    alert(`Network error approving command: ${e}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Approve Execution ⚡";
+  }
+}
+
+async function handleHITLReject() {
+  const btn = document.getElementById("hitl-reject-btn");
+  btn.disabled = true;
+  btn.textContent = "Rejecting... ⏳";
+  try {
+    const res = await fetch(`${API_BASE}/api/sprint/reject?_=${Date.now()}`, {
+      method: "POST"
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      document.getElementById("hitl-modal").classList.remove("show");
+    } else {
+      alert(`Rejection failed: ${data.message}`);
+    }
+  } catch (e) {
+    alert(`Network error rejecting command: ${e}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Reject & Abort 🛑";
+  }
+}
+
+async function fetchWebhookConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/config/webhook?_=${Date.now()}`);
+    const data = await res.json();
+    if (data) {
+      document.getElementById("webhook-slack-url").value = data.slack_webhook || "";
+    }
+  } catch (e) {
+    console.error("Failed to fetch webhook config:", e);
+  }
+}
+
+async function saveWebhookConfig() {
+  const slackUrl = document.getElementById("webhook-slack-url").value.trim();
+  const btn = document.getElementById("webhook-save-btn");
+  btn.disabled = true;
+  updateButtonState(btn, "Saving... 💾", "save");
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/config/webhook?_=${Date.now()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slack_webhook: slackUrl })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      alert("Notification webhook settings saved!");
+    } else {
+      alert(`Failed to save: ${data.message}`);
+    }
+  } catch (e) {
+    alert(`Error saving webhook settings: ${e}`);
+  } finally {
+    btn.disabled = false;
+    updateButtonState(btn, "Save Webhooks 💾", "save");
   }
 }
 

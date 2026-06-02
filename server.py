@@ -481,6 +481,96 @@ async def api_sprint_status():
         }
     }
 
+# --------------------------------------------------------------------
+# HITL Approval & Webhook Config Endpoints
+# --------------------------------------------------------------------
+WEBHOOK_CONFIG_PATH = os.path.join(LOGS_DIR, "webhook_config.json")
+
+def load_webhook_config() -> dict:
+    if os.path.exists(WEBHOOK_CONFIG_PATH):
+        try:
+            with open(WEBHOOK_CONFIG_PATH, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"slack_webhook": "", "whatsapp_webhook": ""}
+
+def save_webhook_config(config: dict):
+    try:
+        with open(WEBHOOK_CONFIG_PATH, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        print(f"Error saving webhook config: {e}")
+
+@app.get("/api/config/webhook")
+async def api_get_webhook_config():
+    return load_webhook_config()
+
+@app.post("/api/config/webhook")
+async def api_post_webhook_config(payload: dict):
+    save_webhook_config(payload)
+    return {"status": "success", "message": "Webhook configuration updated successfully."}
+
+@app.get("/api/sprint/approval")
+async def api_sprint_approval():
+    state_file = os.path.join(LOGS_DIR, "sprint_state.json")
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, "r") as f:
+                state = json.load(f)
+                
+                # Resolve requesting agent name
+                phase_to_agent = {
+                    "think": "CEO Agent",
+                    "plan": "Engineering Manager",
+                    "design": "Designer",
+                    "build": "Coder Agent",
+                    "review": "Release Engineer",
+                    "test": "QA Lead",
+                    "ship": "Release Engineer"
+                }
+                curr_phase = state.get("current_phase", "build")
+                agent_name = phase_to_agent.get(curr_phase, "Release Engineer")
+                
+                return {
+                    "approval_status": state.get("approval_status", ""),
+                    "requested_command": state.get("requested_command", ""),
+                    "requesting_agent": agent_name
+                }
+        except Exception:
+            pass
+    return {"approval_status": "", "requested_command": "", "requesting_agent": "Release Engineer"}
+
+@app.post("/api/sprint/approve")
+async def api_sprint_approve():
+    state_file = os.path.join(LOGS_DIR, "sprint_state.json")
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, "r") as f:
+                state = json.load(f)
+            state["approval_status"] = "approved"
+            with open(state_file, "w") as f:
+                json.dump(state, f, indent=2)
+            return {"status": "success", "message": "Command approved successfully."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to approve command: {e}")
+    raise HTTPException(status_code=404, detail="Sprint state not found.")
+
+@app.post("/api/sprint/reject")
+async def api_sprint_reject():
+    state_file = os.path.join(LOGS_DIR, "sprint_state.json")
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, "r") as f:
+                state = json.load(f)
+            state["approval_status"] = "rejected"
+            with open(state_file, "w") as f:
+                json.dump(state, f, indent=2)
+            return {"status": "success", "message": "Command rejected successfully."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to reject command: {e}")
+    raise HTTPException(status_code=404, detail="Sprint state not found.")
+
 @app.get("/api/agent/log")
 async def api_agent_log(agent: str = Query(..., description="The agent key (e.g. ceo, coder)")) -> JSONResponse:
     log_path = os.path.join(LOGS_DIR, f"{agent}.log")
@@ -590,8 +680,12 @@ async def api_get_freellmapi_models(url: str = None, token: str = None):
 @app.get("/api/models")
 async def api_models():
     config = load_provider_config()
-    if config.get("provider") == "freellmapi":
+    provider = config.get("provider")
+    if provider == "freellmapi":
         model_name = "FreeLLMAPI: " + config.get("freellmapi_model", "google/gemini-2.5-flash")
+        return {"active_model": model_name}
+    elif provider == "cloud_first":
+        model_name = "Cloud First: " + config.get("freellmapi_model", "google/gemini-2.5-flash")
         return {"active_model": model_name}
     return {"active_model": resolve_local_model()}
 
