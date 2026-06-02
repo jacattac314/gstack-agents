@@ -84,12 +84,13 @@ def run_git_with_github_token(args, username: str, token: str, cwd: str, env: di
     )
 
 # Helper to run the sprint in background
-async def run_sprint_background(goal: str):
+def run_sprint_background(goal: str):
     global active_sprint_task
+    import asyncio
     try:
         orchestrator = GStackSprintOrchestrator(goal)
         active_sprint_task = orchestrator
-        await orchestrator.run_sprint()
+        asyncio.run(orchestrator.run_sprint())
     except Exception as e:
         print(f"Error in background sprint execution: {e}")
     finally:
