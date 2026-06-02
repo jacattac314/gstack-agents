@@ -3,6 +3,7 @@ import json
 import subprocess
 import re
 import shutil
+import base64
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
@@ -16,11 +17,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for frontend dashboard UI
+# Only the local dashboard and packaged Tauri webview should be able to call the
+# local control API from a browser context.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origin_regex=r"^(tauri://localhost|https?://(localhost|127\.0\.0\.1)(:\d+)?)$",
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -47,6 +49,35 @@ def load_github_token():
             pass
 
 load_github_token()
+
+def redact_secret(text: str, secret: str = None) -> str:
+    if not text:
+        return text
+    redacted = text
+    if secret:
+        redacted = redacted.replace(secret, "[redacted]")
+    return re.sub(r"https://[^@\s]+@", "https://[redacted]@", redacted)
+
+def github_auth_header(username: str, token: str) -> str:
+    auth = base64.b64encode(f"{username}:{token}".encode("utf-8")).decode("ascii")
+    return f"AUTHORIZATION: Basic {auth}"
+
+def run_git_with_github_token(args, username: str, token: str, cwd: str, env: dict = None, timeout: int = None):
+    command = [
+        "git",
+        "-c",
+        f"http.https://github.com/.extraheader={github_auth_header(username, token)}",
+        *args,
+    ]
+    return subprocess.run(
+        command,
+        env=env,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=timeout,
+    )
 
 # Helper to run the sprint in background
 async def run_sprint_background(goal: str):
@@ -120,8 +151,7 @@ async def api_github_status():
     if os.path.exists(git_dir):
         try:
             res = subprocess.run(
-                "git remote get-url origin",
-                shell=True,
+                ["git", "remote", "get-url", "origin"],
                 cwd=WORKSPACE_DIR,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -178,13 +208,13 @@ async def api_github_login(payload: dict):
         os.environ["GITHUB_TOKEN"] = token
         os.environ["GH_TOKEN"] = token
         
-        # If origin exists in workspace, update it to use token
+        # If origin exists in workspace, remove any embedded credentials instead
+        # of persisting the new token into .git/config.
         git_dir = os.path.join(WORKSPACE_DIR, ".git")
         if os.path.exists(git_dir):
             try:
                 res_url = subprocess.run(
-                    "git remote get-url origin",
-                    shell=True,
+                    ["git", "remote", "get-url", "origin"],
                     cwd=WORKSPACE_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -193,11 +223,8 @@ async def api_github_login(payload: dict):
                 )
                 if res_url.returncode == 0 and res_url.stdout:
                     url = res_url.stdout.strip()
-                    # Strip existing credentials and re-inject new token
                     clean_url = re.sub(r"https://[^@]+@", "https://", url)
-                    repo_path = clean_url.replace("https://github.com/", "")
-                    authed_url = f"https://{username}:{token}@github.com/{repo_path}"
-                    subprocess.run(f"git remote set-url origin {authed_url}", shell=True, cwd=WORKSPACE_DIR, timeout=5)
+                    subprocess.run(["git", "remote", "set-url", "origin", clean_url], cwd=WORKSPACE_DIR, timeout=5)
             except Exception:
                 pass
                 
@@ -279,20 +306,19 @@ async def api_github_sync(payload: dict):
                 shutil.rmtree(WORKSPACE_DIR)
             os.makedirs(WORKSPACE_DIR, exist_ok=True)
             
-            # Embed username and token in clone URL to guarantee passwordless credentials
-            clone_url = f"https://{username}:{token}@github.com/{username}/{repo_name}.git"
+            clone_url = f"https://github.com/{username}/{repo_name}.git"
             
-            res = subprocess.run(
-                f"git clone {clone_url} .",
-                shell=True,
+            res = run_git_with_github_token(
+                ["clone", clone_url, "."],
+                username,
+                token,
+                WORKSPACE_DIR,
                 env=env,
-                cwd=WORKSPACE_DIR,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
             )
             if res.returncode != 0:
-                raise Exception(res.stderr or "Clone failed")
+                raise Exception(redact_secret(res.stderr or "Clone failed", token))
+            
+            subprocess.run(["git", "remote", "set-url", "origin", clone_url], cwd=WORKSPACE_DIR, timeout=5)
                 
             return {
                 "status": "success",
@@ -309,12 +335,12 @@ async def api_github_sync(payload: dict):
         try:
             # Create repo on GitHub with optional description
             desc_val = payload.get("description", "").strip()
-            clean_desc = desc_val.replace('"', '\\"')
-            desc_flag = f'--description "{clean_desc}"' if clean_desc else ""
+            create_args = ["gh", "repo", "create", repo_name, "--public"]
+            if desc_val:
+                create_args.extend(["--description", desc_val])
             
             res = subprocess.run(
-                f"gh repo create {repo_name} --public {desc_flag}",
-                shell=True,
+                create_args,
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -325,14 +351,13 @@ async def api_github_sync(payload: dict):
                 raise Exception(res.stderr or "GitHub repository creation failed")
                 
             # Initialize Git inside workspace
-            subprocess.run("git init", shell=True, cwd=WORKSPACE_DIR)
+            subprocess.run(["git", "init"], cwd=WORKSPACE_DIR)
             
             # Remove existing remote if it exists
-            subprocess.run("git remote remove origin", shell=True, cwd=WORKSPACE_DIR)
+            subprocess.run(["git", "remote", "remove", "origin"], cwd=WORKSPACE_DIR)
             
-            # Add authenticated remote origin
-            remote_url = f"https://{username}:{token}@github.com/{username}/{repo_name}.git"
-            subprocess.run(f"git remote add origin {remote_url}", shell=True, cwd=WORKSPACE_DIR)
+            remote_url = f"https://github.com/{username}/{repo_name}.git"
+            subprocess.run(["git", "remote", "add", "origin", remote_url], cwd=WORKSPACE_DIR)
             
             # Create a base README.md if workspace is empty
             readme_path = os.path.join(WORKSPACE_DIR, "README.md")
@@ -342,21 +367,19 @@ async def api_github_sync(payload: dict):
                     f.write(f"# {repo_name}\n{desc_para}\nAutomated workspace project created via local GStack Agent stack.\n")
                     
             # Stage, commit, and push initial commit
-            subprocess.run("git add .", shell=True, cwd=WORKSPACE_DIR)
-            subprocess.run('git commit -m "initial commit from local gstack agents"', shell=True, cwd=WORKSPACE_DIR)
-            subprocess.run("git branch -M main", shell=True, cwd=WORKSPACE_DIR)
+            subprocess.run(["git", "add", "."], cwd=WORKSPACE_DIR)
+            subprocess.run(["git", "commit", "-m", "initial commit from local gstack agents"], cwd=WORKSPACE_DIR)
+            subprocess.run(["git", "branch", "-M", "main"], cwd=WORKSPACE_DIR)
             
-            push_res = subprocess.run(
-                "git push -u origin main",
-                shell=True,
+            push_res = run_git_with_github_token(
+                ["push", "-u", "origin", "main"],
+                username,
+                token,
+                WORKSPACE_DIR,
                 env=env,
-                cwd=WORKSPACE_DIR,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
             )
             if push_res.returncode != 0:
-                raise Exception(push_res.stderr or "Initial git push failed")
+                raise Exception(redact_secret(push_res.stderr or "Initial git push failed", token))
                 
             return {
                 "status": "success",
@@ -574,4 +597,4 @@ async def api_models():
 
 if __name__ == "__main__":
     print(f"Initializing GStack API Dashboard on http://127.0.0.1:8000...")
-    uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)

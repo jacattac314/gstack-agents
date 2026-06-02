@@ -21,6 +21,59 @@ let pollers = [];
 let isInitialLoad = true;
 let lastObservedPhase = null;
 
+const PHASE_ORDER = ["think", "plan", "design", "build", "review", "test", "ship"];
+const PHASE_DETAILS = {
+  think: {
+    label: "Think",
+    agent: "CEO Agent",
+    pending: "Will clarify the objective, constraints, and success criteria.",
+    running: "CEO Agent is shaping the brief and deciding what the sprint should deliver.",
+    completed: "CEO Agent brainstormed the brief spec."
+  },
+  plan: {
+    label: "Plan",
+    agent: "Eng Manager",
+    pending: "Will turn the brief into a practical technical plan.",
+    running: "Eng Manager is mapping implementation steps, risks, and file targets.",
+    completed: "Eng Manager designed the technical spec."
+  },
+  design: {
+    label: "Design",
+    agent: "Designer",
+    pending: "Will define the visual direction, layout, and interaction details.",
+    running: "Designer is shaping the UI, spacing, visual hierarchy, and polish.",
+    completed: "Designer styled the UI and layout."
+  },
+  build: {
+    label: "Build",
+    agent: "Coder Agent",
+    pending: "Will write the working code and produce a runnable artifact.",
+    running: "Coder Agent is implementing the sprint deliverable.",
+    completed: "Coder Agent wrote the working code."
+  },
+  review: {
+    label: "Review",
+    agent: "Release Eng",
+    pending: "Will review the implementation for correctness and release risk.",
+    running: "Release Eng is checking the code for problems before QA.",
+    completed: "Release Eng reviewed the code."
+  },
+  test: {
+    label: "Test",
+    agent: "QA Lead",
+    pending: "Will verify the result and look for user-visible failures.",
+    running: "QA Lead is testing the artifact and checking behavior.",
+    completed: "QA Lead ran verification tests."
+  },
+  ship: {
+    label: "Ship",
+    agent: "Release Eng",
+    pending: "Will package the final result and report the outcome.",
+    running: "Release Eng is preparing the sprint output for handoff.",
+    completed: "Release Eng bundled and shipped the app."
+  }
+};
+
 // DOM Elements
 const activeModelEl = document.getElementById("active-model-id");
 const composerTextarea = document.getElementById("composer-textarea");
@@ -45,6 +98,54 @@ const previewFileContent = document.getElementById("preview-file-content");
 
 const metricRuns = document.getElementById("metric-runs");
 const metricSavings = document.getElementById("metric-savings");
+
+function replaceSelectOptions(selectEl, options) {
+  selectEl.replaceChildren(...options);
+}
+
+function createOption(value, label) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  return option;
+}
+
+function workspaceFileUrl(filename) {
+  return `${API_BASE}/workspace/app/${encodeURIComponent(filename)}`;
+}
+
+function compactTooltipText(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  return text.length > 140 ? `${text.slice(0, 137)}...` : text;
+}
+
+function getPhaseTooltip(phase, phaseState, index, currentIndex) {
+  const details = PHASE_DETAILS[phase];
+  const status = phaseState && phaseState.status ? phaseState.status : "pending";
+
+  if (status === "failed") {
+    const reason = compactTooltipText(phaseState.error || phaseState.summary);
+    return `${details.label} · Failed\n${reason || "This phase could not complete."}`;
+  }
+
+  if (status === "cancelled") {
+    return `${details.label} · Cancelled\nThis phase was stopped before it finished.`;
+  }
+
+  if (state.current_phase === phase || status === "running") {
+    return `${details.label} · Running\n${details.running}`;
+  }
+
+  if (status === "completed" || state.current_phase === "completed" || (currentIndex !== -1 && index < currentIndex)) {
+    const summary = compactTooltipText(phaseState && phaseState.summary);
+    return summary
+      ? `${details.label} · Done\n${details.completed}\nResult: ${summary}`
+      : `${details.label} · Done\n${details.completed}`;
+  }
+
+  return `${details.label} · Queued\n${details.pending}`;
+}
 
 // GitHub DOM Elements
 const githubStatusDot = document.getElementById("github-status-dot");
@@ -110,16 +211,15 @@ function populateRepoDropdown(filteredList = null) {
   const listToUse = filteredList !== null ? filteredList : fetchedRepos;
   
   if (listToUse.length === 0) {
-    githubRepoSelect.innerHTML = `<option value="">No matching repositories</option>`;
+    replaceSelectOptions(githubRepoSelect, [createOption("", "No matching repositories")]);
     return;
   }
   
-  let html = listToUse.map(repo => {
+  const options = listToUse.map(repo => {
     const isPrivate = repo.private ? "🔒" : "🌐";
-    return `<option value="${repo.name}">${isPrivate} ${repo.full_name}</option>`;
-  }).join("");
-  
-  githubRepoSelect.innerHTML = html;
+    return createOption(repo.name, `${isPrivate} ${repo.full_name}`);
+  });
+  replaceSelectOptions(githubRepoSelect, options);
   
   // Auto-select the newly synced/created repository if registered
   if (repoToSelectAfterFetch && listToUse.some(r => r.name === repoToSelectAfterFetch)) {
@@ -271,7 +371,7 @@ function toggleProviderConfigFields() {
 
 async function fetchFreeLLMAPIModels(selectedModel = null, url = null, token = null) {
   try {
-    freellmapiModelSelect.innerHTML = `<option value="">Loading models list... ⏳</option>`;
+    replaceSelectOptions(freellmapiModelSelect, [createOption("", "Loading models list... ⏳")]);
     let fetchUrl = `${API_BASE}/api/config/freellmapi/models?_=${Date.now()}`;
     if (url) {
       fetchUrl += `&url=${encodeURIComponent(url)}`;
@@ -283,12 +383,11 @@ async function fetchFreeLLMAPIModels(selectedModel = null, url = null, token = n
     const data = await res.json();
     
     if (data && data.data) {
-      let html = "";
-      data.data.forEach(model => {
+      const options = data.data.map(model => {
         const nameLabel = model.name ? `${model.name} (${model.owned_by || 'proxy'})` : model.id;
-        html += `<option value="${model.id}">${nameLabel}</option>`;
+        return createOption(model.id, nameLabel);
       });
-      freellmapiModelSelect.innerHTML = html;
+      replaceSelectOptions(freellmapiModelSelect, options);
       
       if (selectedModel) {
         const exactMatch = data.data.some(m => m.id === selectedModel);
@@ -309,11 +408,11 @@ async function fetchFreeLLMAPIModels(selectedModel = null, url = null, token = n
         }
       }
     } else {
-      freellmapiModelSelect.innerHTML = `<option value="">No models resolved</option>`;
+      replaceSelectOptions(freellmapiModelSelect, [createOption("", "No models resolved")]);
     }
   } catch (e) {
     console.error("Failed to fetch FreeLLMAPI models list:", e);
-    freellmapiModelSelect.innerHTML = `<option value="">Error loading models</option>`;
+    replaceSelectOptions(freellmapiModelSelect, [createOption("", "Error loading models")]);
   }
 }
 
@@ -702,37 +801,28 @@ function updateUIState() {
     const iframe = document.getElementById("live-preview-iframe");
     const previewUrl = document.getElementById("live-preview-url");
     if (iframe && previewUrl && iframe.src.indexOf(deliverable) === -1) {
-      const url = `/workspace/app/${deliverable}`;
+      const url = workspaceFileUrl(deliverable);
       iframe.src = url;
       previewUrl.textContent = url;
       // Auto-switch to Live Preview tab to show the user the live progress!
       switchTab("preview");
+    }
   }
 
   // Update 3D Runway Text dynamically based on active sprint steps
   const runwayOverlay = document.getElementById("runway-text-overlay");
   if (runwayOverlay) {
     let lines = [];
-    const phaseNames = ["think", "plan", "design", "build", "review", "test", "ship"];
-    const phaseDisplayNames = {
-      think: "CEO Agent brainstorms brief spec",
-      plan: "Eng Manager designs technical spec",
-      design: "Designer styles UI & layout",
-      build: "Coder Agent writes clean working code",
-      review: "Release Eng reviews the code",
-      test: "QA Lead runs verification tests",
-      ship: "Release Eng bundles & ships app"
-    };
 
     let lineIndex = 1;
-    phaseNames.forEach(p => {
+    PHASE_ORDER.forEach(p => {
       const pState = state.phases[p];
       if (pState && (pState.status === "completed" || state.current_phase === p)) {
         const isCurrent = state.current_phase === p;
         const icon = pState.status === "completed" ? "✓" : "⚡";
         const color = isCurrent ? "#fff" : "rgba(255,255,255,0.6)";
         const weight = isCurrent ? "bold" : "normal";
-        lines.push(`<div class="runway-line" style="color: ${color}; font-weight: ${weight}; margin-bottom: 4px;">${lineIndex}. ${icon} <strong>${phaseDisplayNames[p]}</strong></div>`);
+        lines.push(`<div class="runway-line" style="color: ${color}; font-weight: ${weight}; margin-bottom: 4px;">${lineIndex}. ${icon} <strong>${PHASE_DETAILS[p].completed}</strong></div>`);
         lineIndex++;
       }
     });
@@ -766,17 +856,23 @@ function updateUIState() {
   }
 
   // 3. Update Timeline Stages Nodes & Badges
-  const phasesOrder = ["think", "plan", "design", "build", "review", "test", "ship"];
-  const currentIdx = phasesOrder.indexOf(state.current_phase);
+  const currentIdx = PHASE_ORDER.indexOf(state.current_phase);
 
-  phasesOrder.forEach((phase, idx) => {
+  PHASE_ORDER.forEach((phase, idx) => {
     // Map timeline node id
     const nodeId = `node-${phase}`;
     const nodeEl = document.getElementById(nodeId);
     if (!nodeEl) return;
 
     // Reset styles
-    nodeEl.classList.remove("active", "completed", "cancelled");
+    nodeEl.classList.remove("active", "completed", "cancelled", "failed");
+    const phaseState = state.phases[phase];
+    const tooltip = getPhaseTooltip(phase, phaseState, idx, currentIdx);
+    nodeEl.tabIndex = 0;
+    nodeEl.setAttribute("role", "button");
+    nodeEl.setAttribute("aria-label", tooltip.replace(/\n/g, ". "));
+    nodeEl.setAttribute("title", tooltip);
+    nodeEl.dataset.tooltip = tooltip;
 
     const badgeEl = document.getElementById(`badge-${phase}`);
     if (badgeEl) {
@@ -795,7 +891,16 @@ function updateUIState() {
       nodeEl.classList.remove("active-tab");
     }
 
-    if (state.phases[phase] && state.phases[phase].status === "cancelled") {
+    if (phaseState && phaseState.status === "failed") {
+      nodeEl.classList.add("failed");
+      if (badgeEl) {
+        badgeEl.classList.add("active", "failed");
+        badgeEl.textContent = "!";
+      }
+      if (connector && connector.classList.contains("timeline-connector")) {
+        connector.classList.remove("completed");
+      }
+    } else if (phaseState && phaseState.status === "cancelled") {
       nodeEl.classList.add("cancelled");
       if (badgeEl) {
         badgeEl.classList.add("active", "cancelled");
@@ -810,7 +915,7 @@ function updateUIState() {
         badgeEl.classList.add("active", "running");
         badgeEl.innerHTML = '<div class="mini-spinner"></div>';
       }
-    } else if (state.phases[phase] && state.phases[phase].status === "completed") {
+    } else if (phaseState && phaseState.status === "completed") {
       nodeEl.classList.add("completed");
       if (badgeEl) {
         badgeEl.classList.add("active", "completed");
@@ -848,21 +953,32 @@ function renderWorkspaceTree(files) {
   }
 
   if (!files || files.length === 0) {
-    workspaceTree.innerHTML = `<span class="empty-state">No files built in workspace yet.</span>`;
+    const emptyState = document.createElement("span");
+    emptyState.className = "empty-state";
+    emptyState.textContent = "No files built in workspace yet.";
+    workspaceTree.replaceChildren(emptyState);
     return;
   }
 
-  let html = "";
+  const fileItems = [];
   files.forEach(file => {
-    const isActive = activeFile === file.name ? "active" : "";
-    html += `
-      <div class="file-item ${isActive}" onclick="inspectFile('${file.name}')">
-        <span class="file-name">📄 ${file.name}</span>
-        <span class="file-size">${file.size} B</span>
-      </div>
-    `;
+    const fileItem = document.createElement("button");
+    fileItem.type = "button";
+    fileItem.className = activeFile === file.name ? "file-item active" : "file-item";
+    fileItem.addEventListener("click", () => inspectFile(file.name));
+
+    const fileName = document.createElement("span");
+    fileName.className = "file-name";
+    fileName.textContent = `📄 ${file.name}`;
+
+    const fileSize = document.createElement("span");
+    fileSize.className = "file-size";
+    fileSize.textContent = `${file.size} B`;
+
+    fileItem.append(fileName, fileSize);
+    fileItems.push(fileItem);
   });
-  workspaceTree.innerHTML = html;
+  workspaceTree.replaceChildren(...fileItems);
 }
 
 async function inspectFile(filename) {
@@ -874,7 +990,7 @@ async function inspectFile(filename) {
   fetchWorkspaceFiles();
 
   try {
-    const res = await fetch(`${API_BASE}/api/workspace/file?path=${filename}&_=${Date.now()}`);
+    const res = await fetch(`${API_BASE}/api/workspace/file?path=${encodeURIComponent(filename)}&_=${Date.now()}`);
     const data = await res.json();
     if (data && data.content) {
       previewFileContent.textContent = data.content;
@@ -884,7 +1000,7 @@ async function inspectFile(filename) {
         const iframe = document.getElementById("live-preview-iframe");
         const previewUrl = document.getElementById("live-preview-url");
         if (iframe && previewUrl) {
-          const url = `/workspace/app/${filename}`;
+          const url = workspaceFileUrl(filename);
           iframe.src = url;
           previewUrl.textContent = url;
           // Auto-switch to Live Preview tab to show the rendered output!

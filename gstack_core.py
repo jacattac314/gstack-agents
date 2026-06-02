@@ -363,6 +363,30 @@ class GStackSprintOrchestrator:
         with open(self.state_file_path, "w") as f:
             json.dump(self.state, f, indent=2)
 
+    def notify_completion(self, status: str, summary: str, deliverable: str = None):
+        try:
+            import urllib.request
+            import json
+            url = "http://127.0.0.1:9000/api/sprint/notify"
+            payload = {
+                "status": status,
+                "goal": self.sprint_goal,
+                "summary": summary
+            }
+            if deliverable:
+                payload["deliverable"] = deliverable
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            # Standard urllib request with short timeout
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                pass
+        except Exception as e:
+            print(f"Failed to send sprint completion notification: {e}")
+
     def cancel(self):
         """Cancels the active sprint loop and updates phase state metrics."""
         self.is_cancelled = True
@@ -432,6 +456,7 @@ class GStackSprintOrchestrator:
         self.state["metrics"]["latency_history"].append({"phase": "plan", "duration": round(t1 - t0, 1)})
         self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
         self.save_state()
+        self.notify_completion("planning_completed", em_summary)
 
         # --------------------------------------------------
         # Phase 3: Design (Designer)
@@ -520,6 +545,7 @@ class GStackSprintOrchestrator:
             self.state["current_phase"] = "failed"
             self.save_state()
             print("\n❌ Build failed. Stopping sprint execution.")
+            self.notify_completion("failed", "Build phase failed because the coder did not produce a valid deliverable file.")
             return
 
         if self.is_cancelled:
@@ -531,6 +557,7 @@ class GStackSprintOrchestrator:
         self.state["metrics"]["latency_history"].append({"phase": "build", "duration": round(t1 - t0, 1)})
         self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
         self.save_state()
+        self.notify_completion("build_completed", coder_summary)
 
         # --------------------------------------------------
         # Phase 5: Review (Release Engineer)
@@ -605,3 +632,5 @@ class GStackSprintOrchestrator:
         self.save_state()
         
         print("\n✅ GStack Sprint completed successfully!")
+        deliverable_file = self.state["phases"]["build"].get("deliverable")
+        self.notify_completion("completed", ship_summary, deliverable=deliverable_file)

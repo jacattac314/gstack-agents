@@ -6,3 +6,7 @@ logs/*.log
 logs/sprint_state.json
 .env
 workspace/
+dist/
+build/
+src-tauri/target/
+*.dmg

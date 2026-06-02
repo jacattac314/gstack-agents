@@ -12,7 +12,7 @@ fn main() {
       println!("Booting Tauri wrapper shell... 🚀");
       
       // Spawn python FastAPI sidecar background server
-      let (mut rx, mut child) = Command::new_sidecar("gstack-backend")
+      let (mut rx, child) = Command::new_sidecar("gstack-backend")
         .expect("Failed to initialize python backend sidecar service")
         .spawn()
         .expect("Failed to spawn python backend sidecar child process");

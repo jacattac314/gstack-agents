@@ -11,11 +11,12 @@
   },
   "tauri": {
     "allowlist": {
-      "all": true,
+      "all": false,
       "shell": {
+        "all": false,
         "sidecar": true,
-        "execute": true,
-        "open": true
+        "execute": false,
+        "open": false
       }
     },
     "bundle": {
@@ -34,7 +35,7 @@
       ]
     },
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 http://127.0.0.1:1234 http://localhost:1234 http://127.0.0.1:3001 http://localhost:3001 https://api.github.com; frame-src 'self' http://127.0.0.1:8000 http://localhost:8000; object-src 'none'; base-uri 'none'"
     },
     "windows": [
       {
