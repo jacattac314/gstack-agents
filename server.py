@@ -17,11 +17,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Only the local dashboard and packaged Tauri webview should be able to call the
-# local control API from a browser context.
+_ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "")
+if _ALLOWED_ORIGINS:
+    _cors_kwargs = {"allow_origins": [o.strip() for o in _ALLOWED_ORIGINS.split(",")]}
+else:
+    _cors_kwargs = {"allow_origin_regex": r"^(tauri://localhost|https?://(localhost|127\.0\.0\.1)(:\d+)?)$"}
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(tauri://localhost|https?://(localhost|127\.0\.0\.1)(:\d+)?)$",
+    **_cors_kwargs,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -413,6 +417,14 @@ async def api_sprint_start(payload: dict, background_tasks: BackgroundTasks):
             except Exception:
                 pass
                 
+    # Reset debate logs
+    debate_path = os.path.join(LOGS_DIR, "debate_log.json")
+    if os.path.exists(debate_path):
+        try:
+            os.remove(debate_path)
+        except Exception:
+            pass
+
     # Reset state file
     state_file = os.path.join(LOGS_DIR, "sprint_state.json")
     if os.path.exists(state_file):
@@ -609,6 +621,10 @@ async def api_workspace_file(path: str = Query(..., description="Filename to rea
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/health")
+async def api_health():
+    return {"status": "ok"}
+
 @app.get("/api/config/provider")
 async def api_get_provider_config():
     """Serves the active intelligence provider configuration."""
@@ -676,6 +692,17 @@ async def api_get_freellmapi_models(url: str = None, token: str = None):
             {"id": "nousresearch/hermes-3-llama-3.1-405b:free", "name": "Hermes 3 405B (free)", "owned_by": "openrouter"}
         ]
     }
+
+@app.get("/api/sprint/debate")
+async def api_sprint_debate():
+    debate_file = os.path.join(LOGS_DIR, "debate_log.json")
+    if os.path.exists(debate_file):
+        try:
+            with open(debate_file, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            return {"status": "error", "message": f"Could not read debate logs: {e}"}
+    return []
 
 @app.get("/api/models")
 async def api_models():
