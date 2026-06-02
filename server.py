@@ -437,6 +437,76 @@ async def api_sprint_start(payload: dict, background_tasks: BackgroundTasks):
     background_tasks.add_task(run_sprint_background, goal)
     return {"status": "success", "message": "GStack sprint triggered successfully in background."}
 
+@app.post("/api/sprint/reset")
+async def api_sprint_reset():
+    global active_sprint_task
+    # 1. Stop active thread if running
+    if active_sprint_task is not None:
+        try:
+            active_sprint_task.cancel()
+        except Exception:
+            pass
+        active_sprint_task = None
+        
+    # 2. Reset logs
+    for agent in ["ceo", "eng_manager", "designer", "coder", "qa_lead", "release_engineer"]:
+        log_path = os.path.join(LOGS_DIR, f"{agent}.log")
+        if os.path.exists(log_path):
+            try:
+                os.remove(log_path)
+            except Exception:
+                pass
+                
+    debate_path = os.path.join(LOGS_DIR, "debate_log.json")
+    if os.path.exists(debate_path):
+        try:
+            os.remove(debate_path)
+        except Exception:
+            pass
+
+    # 3. Overwrite sprint state file back to default idle
+    state_file = os.path.join(LOGS_DIR, "sprint_state.json")
+    default_state = {
+        "goal": "No active sprint",
+        "current_phase": "idle",
+        "phases": {
+            "think": {"status": "pending", "agent": "ceo", "summary": ""},
+            "plan": {"status": "pending", "agent": "eng_manager", "summary": ""},
+            "design": {"status": "pending", "agent": "designer", "summary": ""},
+            "build": {"status": "pending", "agent": "coder", "summary": ""},
+            "review": {"status": "pending", "agent": "release_engineer", "summary": ""},
+            "test": {"status": "pending", "agent": "qa_lead", "summary": ""},
+            "ship": {"status": "pending", "agent": "release_engineer", "summary": ""}
+        },
+        "metrics": {
+            "active_model": resolve_local_model(),
+            "total_runs": 0,
+            "accumulated_savings": 0.0,
+            "latency_history": []
+        }
+    }
+    try:
+        with open(state_file, "w") as f:
+            json.dump(default_state, f, indent=2)
+    except Exception:
+        pass
+
+    # 4. Clean workspace: delete all files except hidden files (like .git, .env)
+    try:
+        if os.path.exists(WORKSPACE_DIR):
+            for filename in os.listdir(WORKSPACE_DIR):
+                if filename.startswith("."):
+                    continue
+                file_path = os.path.join(WORKSPACE_DIR, filename)
+                if os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+                else:
+                    os.remove(file_path)
+    except Exception as e:
+        print(f"Error cleaning workspace: {e}")
+
+    return {"status": "success", "message": "Dashboard state and workspace successfully reset."}
+
 @app.post("/api/sprint/stop")
 async def api_sprint_stop():
     global active_sprint_task

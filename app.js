@@ -79,6 +79,7 @@ const activeModelEl = document.getElementById("active-model-id");
 const composerTextarea = document.getElementById("composer-textarea");
 const sprintActionBtn = document.getElementById("sprint-action-btn");
 const sprintLaunchAppBtn = document.getElementById("sprint-launch-app-btn");
+const sprintClearBtn = document.getElementById("sprint-clear-btn");
 const drawerToggleBtn = document.getElementById("drawer-toggle-btn");
 
 const providerSelect = document.getElementById("provider-select");
@@ -326,6 +327,11 @@ function setupEventListeners() {
       window.open("/workspace/app/index.html", "_blank");
     }
   });
+
+  // Reset Dashboard Button
+  if (sprintClearBtn) {
+    sprintClearBtn.addEventListener("click", handleResetDashboard);
+  }
 
   // GitHub Sync Button
   githubSyncBtn.addEventListener("click", syncGitHubProject);
@@ -863,6 +869,8 @@ async function fetchGitHubStatus() {
 // --------------------------------------------------------------------
 // 5. Background Data Pollers
 // --------------------------------------------------------------------
+let renderedDebateCount = 0;
+
 function startPollers() {
   // Poll overall sprint status
   pollers.push(setInterval(fetchSprintStatus, 1500));
@@ -874,6 +882,8 @@ function startPollers() {
   pollers.push(setInterval(fetchGitHubStatus, 5000));
   // Poll HITL Command approvals status
   pollers.push(setInterval(checkHITLApproval, 1000));
+  // Poll real-time agent debate dialogues
+  pollers.push(setInterval(fetchDebateLogs, 1500));
 }
 
 async function fetchSprintStatus() {
@@ -885,6 +895,62 @@ async function fetchSprintStatus() {
       updateUIState();
     }
   } catch (e) {}
+}
+
+async function fetchDebateLogs() {
+  const debateContainer = document.getElementById("debate-chat-container");
+  const activeAgentsLabel = document.getElementById("debate-active-agents");
+  if (!debateContainer || !activeAgentsLabel) return;
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/sprint/debate?_=${Date.now()}`);
+    const messages = await res.json();
+    
+    if (Array.isArray(messages) && messages.length > 0) {
+      if (messages.length !== renderedDebateCount) {
+        if (renderedDebateCount === 0 || messages.length < renderedDebateCount) {
+          debateContainer.innerHTML = "";
+        }
+        
+        for (let i = (renderedDebateCount === 0 || messages.length < renderedDebateCount) ? 0 : renderedDebateCount; i < messages.length; i++) {
+          const msg = messages[i];
+          const msgEl = document.createElement("div");
+          msgEl.className = `debate-message ${msg.avatar}`;
+          
+          const initials = msg.sender.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
+          
+          msgEl.innerHTML = `
+            <div class="debate-message-header">
+              <div class="debate-msg-avatar debate-avatar-${msg.avatar}">${initials}</div>
+              <span class="debate-msg-sender">${msg.sender}</span>
+              <span class="debate-msg-time">${msg.timestamp}</span>
+            </div>
+            <div class="debate-msg-content">${msg.content}</div>
+          `;
+          debateContainer.appendChild(msgEl);
+        }
+        
+        renderedDebateCount = messages.length;
+        debateContainer.scrollTop = debateContainer.scrollHeight;
+      }
+      
+      const currentMsg = messages[messages.length - 1];
+      const stage = currentMsg.phase ? currentMsg.phase.toUpperCase() : "SPRINT";
+      activeAgentsLabel.textContent = `Active debate in [${stage}] phase...`;
+    } else {
+      if (renderedDebateCount !== 0) {
+        debateContainer.innerHTML = `
+          <div class="debate-placeholder-text">
+            Start a new sprint goal to watch the agents debate architectural specifications and security boundaries.
+          </div>
+        `;
+        renderedDebateCount = 0;
+      }
+      activeAgentsLabel.textContent = "Awaiting sprint...";
+    }
+  } catch (e) {
+    console.error("Error polling debate logs:", e);
+  }
 }
 
 async function fetchAgentLog() {
@@ -1186,9 +1252,11 @@ function updateButtonState(btnEl, text, iconType) {
     svgMarkup = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; flex-shrink: 0; margin-right: 8px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`;
   } else if (iconType === "save") {
     svgMarkup = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; flex-shrink: 0; margin-right: 8px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+  } else if (iconType === "trash") {
+    svgMarkup = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; flex-shrink: 0; margin-right: 8px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`;
   }
   
-  const cleanText = text.replace(/[🔑⚡💾]/g, "").trim();
+  const cleanText = text.replace(/[🔑⚡💾🧹]/g, "").trim();
   btnEl.innerHTML = `${svgMarkup}<span>${cleanText}</span>`;
 }
 
@@ -1447,6 +1515,77 @@ async function saveWebhookConfig() {
   } finally {
     btn.disabled = false;
     updateButtonState(btn, "Save Webhooks 💾", "save");
+  }
+}
+
+async function handleResetDashboard() {
+  if (!confirm("Are you sure you want to reset GStack to its original state? This will stop any active runs, delete all generated files, and clean all terminal logs.")) {
+    return;
+  }
+  
+  const btn = document.getElementById("sprint-clear-btn");
+  if (btn) {
+    btn.disabled = true;
+    updateButtonState(btn, "Resetting... 🧹", "trash");
+  }
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/sprint/reset?_=${Date.now()}`, {
+      method: "POST"
+    });
+    const data = await res.json();
+    
+    if (data.status === "success") {
+      // 1. Reset client-side state variables
+      composerTextarea.value = "";
+      activeFile = null;
+      lastObservedPhase = null;
+      activeAgent = "ceo"; // Reset active terminal agent
+      
+      // 2. Fetch fresh status from backend to restore default states
+      await fetchSprintStatus();
+      await fetchWorkspaceFiles();
+      
+      // 3. Clear file inspector pre body
+      previewFileContent.textContent = "Select a file from the workspace above to inspect its code contents in real time.";
+      
+      // 4. Force reset nodes in the DOM to default state (first node think is active, others idle)
+      pipelineNodes.forEach((nodeEl, idx) => {
+        nodeEl.className = "node-3d";
+        if (idx === 0) {
+          nodeEl.classList.add("active", "active-tab");
+        }
+        
+        const badgeEl = document.getElementById(`badge-${nodeEl.id.replace("node-", "")}`);
+        if (badgeEl) {
+          badgeEl.className = "node-3d-badge";
+          badgeEl.innerHTML = "";
+        }
+      });
+      
+      // 5. Restore original terminal logs text
+      terminalOutput.textContent = "Waiting to launch GStack local agents... Ready.";
+      terminalName.textContent = "TERMINAL: ceo_agent";
+      
+      // 6. Reset live preview iframe
+      const iframe = document.getElementById("live-preview-iframe");
+      const previewUrl = document.getElementById("live-preview-url");
+      if (iframe && previewUrl) {
+        iframe.src = "about:blank";
+        previewUrl.textContent = "None";
+      }
+      
+      alert("GStack workspace successfully reset back to original state!");
+    } else {
+      alert(`Failed to reset dashboard: ${data.message}`);
+    }
+  } catch (e) {
+    alert(`Network error resetting dashboard: ${e}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      updateButtonState(btn, "Reset Dashboard 🧹", "trash");
+    }
   }
 }
 
