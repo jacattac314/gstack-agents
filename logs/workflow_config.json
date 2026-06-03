@@ -15,24 +15,10 @@
       "active": true
     },
     {
-      "phase": "architecture",
-      "agent": "architect",
-      "label": "Architecture",
-      "sub": "Technical Architect",
-      "active": true
-    },
-    {
       "phase": "design",
       "agent": "designer",
       "label": "Design",
       "sub": "Designer",
-      "active": true
-    },
-    {
-      "phase": "design_qa",
-      "agent": "design_qa",
-      "label": "Design QA",
-      "sub": "Design QA Specialist",
       "active": true
     },
     {
@@ -43,9 +29,9 @@
       "active": true
     },
     {
-      "phase": "security_audit",
+      "phase": "security_review",
       "agent": "security_auditor",
-      "label": "Security Audit",
+      "label": "Security Review",
       "sub": "Security Auditor",
       "active": true
     },
@@ -68,13 +54,6 @@
       "agent": "release_engineer",
       "label": "Ship",
       "sub": "Release Eng",
-      "active": true
-    },
-    {
-      "phase": "continuous_improvement",
-      "agent": "hermes",
-      "label": "Continuous Improvement",
-      "sub": "Hermes Agent",
       "active": true
     }
   ],

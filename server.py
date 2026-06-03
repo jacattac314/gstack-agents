@@ -855,31 +855,209 @@ async def api_post_custom_agent(payload: dict):
         with open(skill_file_path, "w") as f:
             f.write(prompt)
             
-        # Update workflow_config
-        config = load_workflow_config()
-        # Check if agent already exists in custom_agents
-        custom_agents = config.get("custom_agents", [])
-        exists = False
-        for a in custom_agents:
-            if a.get("key") == key:
-                a["name"] = name
-                a["sub"] = sub
-                a["prompt"] = prompt
-                exists = True
-                break
-        if not exists:
-            custom_agents.append({
-                "key": key,
-                "name": name,
-                "sub": sub,
-                "prompt": prompt
-            })
-        config["custom_agents"] = custom_agents
-        save_workflow_config(config)
+        # Core keys check
+        CORE_KEYS = ["ceo", "eng_manager", "designer", "coder", "release_engineer", "qa_lead", "architect", "researcher", "security_auditor", "design_qa", "hermes"]
         
-        return {"status": "success", "message": f"Custom agent '{name}' successfully created and saved!"}
+        if key not in CORE_KEYS:
+            # Update workflow_config
+            config = load_workflow_config()
+            # Check if agent already exists in custom_agents
+            custom_agents = config.get("custom_agents", [])
+            exists = False
+            for a in custom_agents:
+                if a.get("key") == key:
+                    a["name"] = name
+                    a["sub"] = sub
+                    a["prompt"] = prompt
+                    exists = True
+                    break
+            if not exists:
+                custom_agents.append({
+                    "key": key,
+                    "name": name,
+                    "sub": sub,
+                    "prompt": prompt
+                })
+            config["custom_agents"] = custom_agents
+            save_workflow_config(config)
+        
+        return {"status": "success", "message": f"Agent '{name}' successfully updated and saved!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/config/agent/{key}")
+async def api_get_agent_config(key: str):
+    from gstack_core import load_workflow_config, SKILLS_DIR
+    key = re.sub(r"[^a-z0-9_]", "", key.lower().strip())
+    
+    # Check if custom agent first
+    config = load_workflow_config()
+    custom_agents = config.get("custom_agents", [])
+    agent_info = None
+    for a in custom_agents:
+        if a.get("key") == key:
+            agent_info = {
+                "key": key,
+                "name": a.get("name"),
+                "sub": a.get("sub"),
+                "prompt": ""
+            }
+            break
+            
+    if not agent_info:
+        # Check core agents
+        CORE_AGENT_INFO = {
+            "ceo": {"name": "CEO Agent", "sub": "Chief Executive Agent"},
+            "eng_manager": {"name": "Eng Manager", "sub": "Engineering Manager"},
+            "designer": {"name": "Designer", "sub": "UX/UI Designer"},
+            "coder": {"name": "Coder Agent", "sub": "Software Engineer"},
+            "release_engineer": {"name": "Release Eng", "sub": "DevOps & Release Engineer"},
+            "qa_lead": {"name": "QA Lead", "sub": "Quality Assurance Specialist"},
+            "architect": {"name": "Technical Architect", "sub": "System Architect"},
+            "researcher": {"name": "Researcher", "sub": "Research Specialist"},
+            "security_auditor": {"name": "Security Auditor", "sub": "Security Specialist"},
+            "design_qa": {"name": "Design QA Specialist", "sub": "Design QA Specialist"},
+            "hermes": {"name": "Hermes Agent", "sub": "Hermes Orchestrator"}
+        }
+        if key in CORE_AGENT_INFO:
+            agent_info = {
+                "key": key,
+                "name": CORE_AGENT_INFO[key]["name"],
+                "sub": CORE_AGENT_INFO[key]["sub"],
+                "prompt": ""
+            }
+        else:
+            # Fallback if unknown
+            agent_info = {
+                "key": key,
+                "name": key.capitalize() + " Agent",
+                "sub": "Custom Agent",
+                "prompt": ""
+            }
+            
+    # Load prompt from SKILLS_DIR/key/SKILL.md
+    prompt_path = os.path.join(SKILLS_DIR, key, "SKILL.md")
+    if os.path.exists(prompt_path):
+        try:
+            with open(prompt_path, "r") as f:
+                agent_info["prompt"] = f.read()
+        except Exception as e:
+            agent_info["prompt"] = f"Error reading prompt file: {e}"
+    else:
+        agent_info["prompt"] = f"You are the {agent_info['name']}."
+        
+    return agent_info
+
+
+@app.post("/api/config/generate_team")
+async def api_generate_team(payload: dict):
+    from gstack_core import chat_local_model, load_workflow_config, save_workflow_config, SKILLS_DIR
+    user_prompt = payload.get("prompt")
+    if not user_prompt:
+        raise HTTPException(status_code=400, detail="Missing 'prompt' in payload")
+
+    system_prompt = (
+        "You are an expert system designer. Your job is to design a multi-agent team configuration "
+        "based on the user's description of the team or goal they want to accomplish.\n\n"
+        "A team consists of active/inactive stages chosen from the following standard stages:\n"
+        "- think: Analyze the request and brainstorm solutions.\n"
+        "- plan: Break down the solution into specific tasks.\n"
+        "- design: Draft details, architecture, and user interface.\n"
+        "- build: Implement code/solutions.\n"
+        "- review: Conduct code reviews and system audits.\n"
+        "- test: Run automated tests and verify functionality.\n"
+        "- ship: Deploy or package the solution.\n\n"
+        "For each stage, you must choose an agent to execute that stage. You can either use an existing agent "
+        "or define a new custom agent specifically tailored for that role.\n\n"
+        "Existing core agents you can use:\n"
+        "- ceo (CEO Agent - good for think)\n"
+        "- eng_manager (Eng Manager - good for plan)\n"
+        "- designer (Designer - good for design)\n"
+        "- coder (Coder Agent - good for build)\n"
+        "- release_engineer (Release Eng - good for review/ship)\n"
+        "- qa_lead (QA Lead - good for test)\n"
+        "- architect (Architect - good for think/design)\n"
+        "- researcher (Researcher - good for think/plan)\n"
+        "- security_auditor (Security Auditor - good for review/test)\n"
+        "- design_qa (Design QA - good for design/test)\n"
+        "- hermes (Hermes Agent - generalist/orchestrator)\n\n"
+        "If you need a new custom agent, you must specify their details. For example, if the user wants "
+        "a solidity auditor, you could create a custom agent with key 'solidity_auditor'.\n\n"
+        "You must respond ONLY with a single JSON object. Do not include markdown wraps or explanations. "
+        "The JSON object must have this exact structure:\n"
+        "{\n"
+        "  \"stages\": [\n"
+        "    {\"phase\": \"think\", \"agent\": \"ceo\", \"label\": \"Think\", \"sub\": \"CEO Agent\", \"active\": true},\n"
+        "    {\"phase\": \"plan\", \"agent\": \"eng_manager\", \"label\": \"Plan\", \"sub\": \"Eng Manager\", \"active\": true},\n"
+        "    {\"phase\": \"design\", \"agent\": \"designer\", \"label\": \"Design\", \"sub\": \"Designer\", \"active\": true},\n"
+        "    {\"phase\": \"build\", \"agent\": \"coder\", \"label\": \"Build\", \"sub\": \"Coder Agent\", \"active\": true},\n"
+        "    {\"phase\": \"review\", \"agent\": \"release_engineer\", \"label\": \"Review\", \"sub\": \"Release Eng\", \"active\": true},\n"
+        "    {\"phase\": \"test\", \"agent\": \"qa_lead\", \"label\": \"Test\", \"sub\": \"QA Lead\", \"active\": true},\n"
+        "    {\"phase\": \"ship\", \"agent\": \"release_engineer\", \"label\": \"Ship\", \"sub\": \"Release Eng\", \"active\": true}\n"
+        "  ],\n"
+        "  \"custom_agents\": [\n"
+        "    {\n"
+        "      \"key\": \"custom_agent_key_lowercase_alphanumeric\",\n"
+        "      \"name\": \"Display Name\",\n"
+        "      \"sub\": \"Short description/sub-label\",\n"
+        "      \"prompt\": \"Detailed system instructions for the agent...\"\n"
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Ensure all stages are represented in the 'stages' list (active can be true or false). "
+        "Any custom agent key used in 'stages' must be defined in the 'custom_agents' list."
+    )
+
+    try:
+        llm_response = await chat_local_model(system_prompt, user_prompt, role_name="debate_generator")
+        clean_response = llm_response.strip()
+        if clean_response.startswith("```"):
+            lines = clean_response.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            clean_response = "\n".join(lines).strip()
+            
+        new_config = json.loads(clean_response)
+        
+        if "stages" not in new_config:
+            raise ValueError("Response missing 'stages'")
+            
+        custom_agents = new_config.get("custom_agents", [])
+        for agent in custom_agents:
+            key = agent.get("key")
+            name = agent.get("name")
+            sub = agent.get("sub")
+            prompt = agent.get("prompt")
+            if key and name and sub and prompt:
+                key = re.sub(r"[^a-z0-9_]", "", key.lower().strip())
+                agent_skill_dir = os.path.join(SKILLS_DIR, key)
+                os.makedirs(agent_skill_dir, exist_ok=True)
+                skill_file_path = os.path.join(agent_skill_dir, "SKILL.md")
+                with open(skill_file_path, "w") as f:
+                    f.write(prompt)
+                    
+        current_config = load_workflow_config()
+        
+        existing_custom_agents = {a["key"]: a for a in current_config.get("custom_agents", [])}
+        for agent in custom_agents:
+            key = re.sub(r"[^a-z0-9_]", "", agent["key"].lower().strip())
+            existing_custom_agents[key] = {
+                "key": key,
+                "name": agent["name"],
+                "sub": agent["sub"],
+                "prompt": agent["prompt"]
+            }
+        current_config["custom_agents"] = list(existing_custom_agents.values())
+        current_config["stages"] = new_config["stages"]
+        
+        save_workflow_config(current_config)
+        
+        return {"status": "success", "config": current_config}
+    except Exception as e:
+        print(f"Error in api_generate_team: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate team: {str(e)}")
 
 @app.get("/api/health")
 async def api_health():

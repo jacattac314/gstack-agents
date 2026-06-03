@@ -350,6 +350,14 @@ function setupEventListeners() {
   if (presetSaveBtn) {
     presetSaveBtn.addEventListener("click", handleSavePreset);
   }
+  
+  const aiTeamGenerateBtn = document.getElementById("ai-team-generate-btn");
+  if (aiTeamGenerateBtn) {
+    aiTeamGenerateBtn.addEventListener("click", handleGenerateAITeam);
+  }
+
+  setupAgentConfigModalListeners();
+
 
 
   // Sprint Toggle Action Button (Launch/Stop)
@@ -1920,6 +1928,11 @@ function renderDraggableAgentsPool() {
       chip.classList.remove("dragging");
       document.body.classList.remove("dragging-active");
     });
+
+    chip.addEventListener("dblclick", () => {
+      openAgentConfigModal(agent.key);
+    });
+
     
     container.appendChild(chip);
   });
@@ -2231,6 +2244,12 @@ function renderTimelineNodesUI() {
       
       fetchAgentLog(); // Immediate fetch on switch
     });
+
+    node.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      openAgentConfigModal(s.agent);
+    });
+
     
     container.appendChild(node);
   });
@@ -2466,6 +2485,144 @@ async function handleSavePreset() {
     presetSaveBtn.innerHTML = originalText;
   }
 }
+
+async function handleGenerateAITeam() {
+  const promptInput = document.getElementById("ai-team-prompt");
+  const generateBtn = document.getElementById("ai-team-generate-btn");
+  if (!promptInput || !generateBtn) return;
+
+  const promptValue = promptInput.value.trim();
+  if (!promptValue) {
+    alert("Please describe the team or goal you want to generate.");
+    return;
+  }
+
+  generateBtn.disabled = true;
+  const originalText = generateBtn.innerHTML;
+  generateBtn.innerHTML = "<span>Generating... ⚙️</span>";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/config/generate_team`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: promptValue })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      alert("AI Team configuration generated successfully!");
+      promptInput.value = "";
+      await fetchWorkflowConfig();
+    } else {
+      alert(`Failed to generate team: ${data.detail || data.message}`);
+    }
+  } catch (e) {
+    alert(`Error generating team: ${e}`);
+  } finally {
+    generateBtn.disabled = false;
+    generateBtn.innerHTML = originalText;
+  }
+}
+
+async function openAgentConfigModal(agentKey) {
+  const modal = document.getElementById("agent-config-modal");
+  const keyInput = document.getElementById("agent-config-key");
+  const nameInput = document.getElementById("agent-config-name");
+  const subInput = document.getElementById("agent-config-sub");
+  const promptInput = document.getElementById("agent-config-prompt");
+  const titleEl = document.getElementById("agent-config-title");
+  
+  if (!modal || !keyInput || !nameInput || !subInput || !promptInput) return;
+
+  keyInput.value = agentKey;
+  if (titleEl) {
+    titleEl.textContent = `Configure Agent: ${agentKey}`;
+  }
+
+  nameInput.value = "Loading...";
+  subInput.value = "Loading...";
+  promptInput.value = "Loading agent configuration, please wait...";
+  modal.classList.add("show");
+
+  try {
+    const res = await fetch(`${API_BASE}/api/config/agent/${agentKey}`);
+    if (res.ok) {
+      const data = await res.json();
+      nameInput.value = data.name || "";
+      subInput.value = data.sub || "";
+      promptInput.value = data.prompt || "";
+    } else {
+      nameInput.value = agentKey;
+      subInput.value = "";
+      promptInput.value = "Failed to load configuration from server.";
+    }
+  } catch (e) {
+    nameInput.value = agentKey;
+    subInput.value = "";
+    promptInput.value = `Error loading agent configuration: ${e}`;
+  }
+}
+
+function setupAgentConfigModalListeners() {
+  const modal = document.getElementById("agent-config-modal");
+  const cancelBtn = document.getElementById("agent-config-cancel-btn");
+  const saveBtn = document.getElementById("agent-config-save-btn");
+  
+  const keyInput = document.getElementById("agent-config-key");
+  const nameInput = document.getElementById("agent-config-name");
+  const subInput = document.getElementById("agent-config-sub");
+  const promptInput = document.getElementById("agent-config-prompt");
+
+  if (!modal || !cancelBtn || !saveBtn) return;
+
+  cancelBtn.addEventListener("click", () => {
+    modal.classList.remove("show");
+  });
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.classList.remove("show");
+    }
+  });
+
+  saveBtn.addEventListener("click", async () => {
+    const key = keyInput.value;
+    const name = nameInput.value.trim();
+    const sub = subInput.value.trim();
+    const prompt = promptInput.value.trim();
+
+    if (!name || !sub || !prompt) {
+      alert("Please fill in all fields (Display Name, Sub-label, and System Prompt).");
+      return;
+    }
+
+    saveBtn.disabled = true;
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = "<span>Saving... ⚙️</span>";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/config/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, name, sub, prompt })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        alert(`Agent '${name}' configuration saved successfully!`);
+        modal.classList.remove("show");
+        await fetchWorkflowConfig();
+      } else {
+        alert(`Failed to save agent configuration: ${data.detail || data.message}`);
+      }
+    } catch (e) {
+      alert(`Error saving agent configuration: ${e}`);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalText;
+    }
+  });
+}
+
+
 
 // Launch initialization
 if (document.readyState === "loading") {
