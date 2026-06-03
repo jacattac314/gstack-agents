@@ -415,9 +415,9 @@ function setupEventListeners() {
   sprintLaunchAppBtn.addEventListener("click", () => {
     const deliverable = state.phases && state.phases.build && state.phases.build.deliverable;
     if (deliverable) {
-      window.open(`/workspace/app/${deliverable}`, "_blank");
+      window.open(`${API_BASE}/workspace/app/${deliverable}`, "_blank");
     } else {
-      window.open("/workspace/app/index.html", "_blank");
+      window.open(`${API_BASE}/workspace/app/index.html`, "_blank");
     }
   });
 
