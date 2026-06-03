@@ -1,0 +1,113 @@
+{
+  "stages": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Think",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Plan",
+      "sub": "Eng Manager",
+      "active": true
+    },
+    {
+      "phase": "architecture",
+      "agent": "architect",
+      "label": "Architecture",
+      "sub": "Technical Architect",
+      "active": true
+    },
+    {
+      "phase": "design",
+      "agent": "designer",
+      "label": "Design",
+      "sub": "Designer",
+      "active": true
+    },
+    {
+      "phase": "design_qa",
+      "agent": "design_qa",
+      "label": "Design QA",
+      "sub": "Design QA Specialist",
+      "active": true
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Build",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "security_audit",
+      "agent": "security_auditor",
+      "label": "Security Audit",
+      "sub": "Security Auditor",
+      "active": true
+    },
+    {
+      "phase": "review",
+      "agent": "release_engineer",
+      "label": "Review",
+      "sub": "Release Eng",
+      "active": true
+    },
+    {
+      "phase": "test",
+      "agent": "qa_lead",
+      "label": "Test",
+      "sub": "QA Lead",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship",
+      "sub": "Release Eng",
+      "active": true
+    },
+    {
+      "phase": "continuous_improvement",
+      "agent": "hermes",
+      "label": "Continuous Improvement",
+      "sub": "Hermes Agent",
+      "active": true
+    }
+  ],
+  "custom_agents": [
+    {
+      "key": "security_auditor",
+      "name": "Security Auditor",
+      "sub": "Security & Compliance Specialist",
+      "prompt": "You are the expert Security Auditor agent. Your job is to audit and verify security compliance."
+    },
+    {
+      "key": "design_qa",
+      "name": "Design QA Specialist",
+      "sub": "Pixel-Perfect Visual Auditor",
+      "prompt": "You are the expert Design QA Specialist. Your role is to audit user interfaces, layout alignment, spacing, color contrast, and CSS rules against modern design standards."
+    },
+    {
+      "key": "researcher",
+      "name": "Researcher",
+      "sub": "Market & Docs Researcher",
+      "prompt": "You are the expert Technical Researcher. Your responsibility is to analyze documentation, look up external APIs, discover libraries, and collect technical background information."
+    },
+    {
+      "key": "architect",
+      "name": "Technical Architect",
+      "sub": "System Architecture Designer",
+      "prompt": "You are the expert Technical Architect. Your role is to design system architectures, select tech stacks, outline databases, and create technical data-flow diagrams."
+    },
+    {
+      "key": "hermes",
+      "name": "Hermes Agent",
+      "sub": "ReAct Orchestration & Command Expert",
+      "prompt": "You are the expert Hermes Agent. Your primary specialization is ReAct Orchestration, CLI execution, directory crawling, tool integration, and executing multi-step build/verify loops."
+    }
+  ]
+}

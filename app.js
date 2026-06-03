@@ -21,8 +21,8 @@ let pollers = [];
 let isInitialLoad = true;
 let lastObservedPhase = null;
 
-const PHASE_ORDER = ["think", "plan", "design", "build", "review", "test", "ship"];
-const PHASE_DETAILS = {
+let PHASE_ORDER = ["think", "plan", "design", "build", "review", "test", "ship"];
+let PHASE_DETAILS = {
   think: {
     label: "Think",
     agent: "CEO Agent",
@@ -74,6 +74,7 @@ const PHASE_DETAILS = {
   }
 };
 
+
 // DOM Elements
 const activeModelEl = document.getElementById("active-model-id");
 const composerTextarea = document.getElementById("composer-textarea");
@@ -88,15 +89,21 @@ const freellmapiConfigSection = document.getElementById("freellmapi-config-secti
 const freellmapiUrlInput = document.getElementById("freellmapi-url");
 const freellmapiTokenInput = document.getElementById("freellmapi-token");
 const freellmapiModelSelect = document.getElementById("freellmapi-model-select");
+const qdrantUrlInput = document.getElementById("qdrant-url");
 const providerSaveBtn = document.getElementById("provider-save-btn");
+const presetSelect = document.getElementById("preset-select");
+const presetLoadBtn = document.getElementById("preset-load-btn");
+const presetNameInput = document.getElementById("preset-name-input");
+const presetSaveBtn = document.getElementById("preset-save-btn");
 const gridContainer = document.querySelector(".dashboard-grid");
-const pipelineNodes = document.querySelectorAll(".runway-viewport .node-3d");
 const terminalOutput = document.getElementById("terminal-output");
 const terminalName = document.getElementById("terminal-name");
 const terminalPulse = document.getElementById("terminal-pulse");
 const workspaceTree = document.getElementById("workspace-tree");
 const previewFileTitle = document.getElementById("preview-file-title");
 const previewFileContent = document.getElementById("preview-file-content");
+const saveFileBtn = document.getElementById("save-file-btn");
+const keepWorkspaceCheckbox = document.getElementById("keep-workspace-checkbox");
 
 const metricRuns = document.getElementById("metric-runs");
 const metricSavings = document.getElementById("metric-savings");
@@ -201,6 +208,8 @@ async function initializeDashboard() {
   fetchWorkspaceFiles();
   fetchProviderConfig();
   fetchWebhookConfig();
+  fetchWorkflowConfig();
+  fetchPresets();
 }
 
 // --------------------------------------------------------------------
@@ -310,22 +319,89 @@ function setupEventListeners() {
     inspectorToggleBtn.title = isCollapsed ? "Show Workspace Inspector" : "Hide Workspace Inspector";
   });
 
-  // Clickable Pipeline Nodes Tab Switching
-  pipelineNodes.forEach(node => {
-    node.addEventListener("click", () => {
-      activeAgent = node.getAttribute("data-agent");
-      terminalName.textContent = `TERMINAL: ${activeAgent}_agent`;
-      
-      // Update visual active-tab class
-      pipelineNodes.forEach(n => n.classList.remove("active-tab"));
-      node.classList.add("active-tab");
-      
-      fetchAgentLog(); // Immediate fetch on switch
+  // Collapsible Agent Workflow Panel Toggle
+  const workflowPanelHeader = document.getElementById("workflow-panel-header");
+  const workflowPanelBody = document.getElementById("workflow-panel-body");
+  const workflowToggleIcon = document.getElementById("workflow-toggle-icon");
+  if (workflowPanelHeader && workflowPanelBody && workflowToggleIcon) {
+    workflowPanelHeader.addEventListener("click", () => {
+      const isHidden = workflowPanelBody.style.display === "none";
+      workflowPanelBody.style.display = isHidden ? "flex" : "none";
+      workflowToggleIcon.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
     });
-  });
+  }
+
+  // Save custom agent button click listener
+  const customAgentSaveBtn = document.getElementById("custom-agent-save-btn");
+  if (customAgentSaveBtn) {
+    customAgentSaveBtn.addEventListener("click", handleSaveCustomAgent);
+  }
+
+  // Add custom stage button click listener
+  const customStageAddBtn = document.getElementById("custom-stage-add-btn");
+  if (customStageAddBtn) {
+    customStageAddBtn.addEventListener("click", handleAddCustomStage);
+  }
+
+  // Preset buttons click listeners
+  if (presetLoadBtn) {
+    presetLoadBtn.addEventListener("click", handleLoadPreset);
+  }
+  if (presetSaveBtn) {
+    presetSaveBtn.addEventListener("click", handleSavePreset);
+  }
+
 
   // Sprint Toggle Action Button (Launch/Stop)
   sprintActionBtn.addEventListener("click", handleSprintAction);
+
+  // Save Edited File Button click listener
+  if (saveFileBtn) {
+    saveFileBtn.addEventListener("click", async () => {
+      if (!activeFile) return;
+      saveFileBtn.disabled = true;
+      const originalText = saveFileBtn.textContent;
+      saveFileBtn.textContent = "Saving... 💾";
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/workspace/file`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path: activeFile,
+            content: previewFileContent.value
+          })
+        });
+        const data = await res.json();
+        if (data && data.status === "success") {
+          saveFileBtn.textContent = "Saved! ✔";
+          setTimeout(() => {
+            saveFileBtn.textContent = "Save 💾";
+            saveFileBtn.disabled = false;
+          }, 1500);
+          
+          // If editing a HTML page, reload it immediately in live preview
+          if (activeFile.toLowerCase().endsWith(".html")) {
+            const iframe = document.getElementById("live-preview-iframe");
+            const previewUrl = document.getElementById("live-preview-url");
+            if (iframe && previewUrl) {
+              const url = workspaceFileUrl(activeFile) + "?t=" + Date.now();
+              iframe.src = url;
+              previewUrl.textContent = url;
+            }
+          }
+        } else {
+          alert(`Error saving file: ${data.message || "Unknown error"}`);
+          saveFileBtn.textContent = originalText;
+          saveFileBtn.disabled = false;
+        }
+      } catch (e) {
+        alert(`Error communicating with backend: ${e}`);
+        saveFileBtn.textContent = originalText;
+        saveFileBtn.disabled = false;
+      }
+    });
+  }
 
   // Launch App Button
   sprintLaunchAppBtn.addEventListener("click", () => {
@@ -591,6 +667,9 @@ async function fetchProviderConfig() {
       providerSelect.value = data.provider || "lm_studio";
       freellmapiUrlInput.value = data.freellmapi_url || "http://localhost:3001/v1";
       freellmapiTokenInput.value = data.freellmapi_token || "";
+      if (qdrantUrlInput) {
+        qdrantUrlInput.value = data.qdrant_url || "http://localhost:6333";
+      }
       
       // Load the models list dynamically, and then select the active model
       await fetchFreeLLMAPIModels(data.freellmapi_model, data.freellmapi_url, data.freellmapi_token);
@@ -607,6 +686,7 @@ async function saveLLMProviderConfig() {
   const url = freellmapiUrlInput.value.trim();
   const token = freellmapiTokenInput.value.trim();
   const model = freellmapiModelSelect.value;
+  const qdrantUrl = qdrantUrlInput ? qdrantUrlInput.value.trim() : "http://localhost:6333";
   
   providerSaveBtn.disabled = true;
   updateButtonState(providerSaveBtn, "Saving... 💾", "save");
@@ -619,7 +699,8 @@ async function saveLLMProviderConfig() {
         provider,
         freellmapi_url: url,
         freellmapi_token: token,
-        freellmapi_model: model
+        freellmapi_model: model,
+        qdrant_url: qdrantUrl
       })
     });
     const data = await res.json();
@@ -680,11 +761,16 @@ async function launchSprint() {
   
   terminalOutput.textContent = "🚀 Launching sprint. Bootstrapping YC-style gStack team agents...\n";
 
+  const keepWorkspace = keepWorkspaceCheckbox ? keepWorkspaceCheckbox.checked : true;
+
   try {
     const res = await fetch(`${API_BASE}/api/sprint/start?_=${Date.now()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goal: goalText })
+      body: JSON.stringify({ 
+        goal: goalText,
+        keep_workspace: keepWorkspace
+      })
     });
     const data = await res.json();
     
@@ -915,51 +1001,168 @@ async function fetchDebateLogs() {
     const res = await fetch(`${API_BASE}/api/sprint/debate?_=${Date.now()}`);
     const messages = await res.json();
     
-    if (Array.isArray(messages) && messages.length > 0) {
-      if (messages.length !== renderedDebateCount) {
-        if (renderedDebateCount === 0 || messages.length < renderedDebateCount) {
-          debateContainer.innerHTML = "";
+      if (Array.isArray(messages) && messages.length > 0) {
+        if (messages.length !== renderedDebateCount) {
+          if (renderedDebateCount === 0 || messages.length < renderedDebateCount) {
+            debateContainer.innerHTML = "";
+          }
+          
+          for (let i = (renderedDebateCount === 0 || messages.length < renderedDebateCount) ? 0 : renderedDebateCount; i < messages.length; i++) {
+            const msg = messages[i];
+            const msgEl = document.createElement("div");
+            msgEl.className = `debate-message ${msg.avatar}`;
+            
+            const initials = msg.sender.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
+            
+            msgEl.innerHTML = `
+              <div class="debate-message-header">
+                <div class="debate-msg-avatar debate-avatar-${msg.avatar}">${initials}</div>
+                <span class="debate-msg-sender">${msg.sender}</span>
+                <span class="debate-msg-time">${msg.timestamp}</span>
+              </div>
+              <div class="debate-msg-content">${msg.content}</div>
+            `;
+            debateContainer.appendChild(msgEl);
+          }
+          
+          renderedDebateCount = messages.length;
+          debateContainer.scrollTop = debateContainer.scrollHeight;
         }
         
-        for (let i = (renderedDebateCount === 0 || messages.length < renderedDebateCount) ? 0 : renderedDebateCount; i < messages.length; i++) {
-          const msg = messages[i];
-          const msgEl = document.createElement("div");
-          msgEl.className = `debate-message ${msg.avatar}`;
-          
-          const initials = msg.sender.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
-          
-          msgEl.innerHTML = `
-            <div class="debate-message-header">
-              <div class="debate-msg-avatar debate-avatar-${msg.avatar}">${initials}</div>
-              <span class="debate-msg-sender">${msg.sender}</span>
-              <span class="debate-msg-time">${msg.timestamp}</span>
+        const currentMsg = messages[messages.length - 1];
+        const stage = currentMsg.phase ? currentMsg.phase.toUpperCase() : "SPRINT";
+        activeAgentsLabel.textContent = `Active debate in [${stage}] phase...`;
+        
+        updateLivePreviewDebateSummary(messages);
+      } else {
+        if (renderedDebateCount !== 0) {
+          debateContainer.innerHTML = `
+            <div class="debate-placeholder-text">
+              Start a new sprint goal to watch the agents debate architectural specifications and security boundaries.
             </div>
-            <div class="debate-msg-content">${msg.content}</div>
           `;
-          debateContainer.appendChild(msgEl);
+          renderedDebateCount = 0;
+        }
+        activeAgentsLabel.textContent = "Awaiting sprint...";
+        
+        updateLivePreviewDebateSummary([]);
+      }
+    } catch (e) {
+      console.error("Error polling debate logs:", e);
+    }
+  }
+
+function updateLivePreviewDebateSummary(messages) {
+  const summaryEl = document.getElementById("live-preview-debate-summary");
+  if (!summaryEl) return;
+  
+  if (!messages || messages.length === 0) {
+    summaryEl.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: rgba(255,255,255,0.45); text-align: center; gap: 12px; padding: 20px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; color: var(--color-cyan); opacity: 0.8; margin-bottom: 8px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span style="font-weight: 600; font-size: 12px; color: #fff;">Awaiting Sprint...</span>
+        <span style="font-size: 10px; max-width: 240px; color: rgba(255,255,255,0.5);">Start a sprint goal to watch the agents debate scope, tasks, and system architecture design.</span>
+      </div>
+    `;
+    return;
+  }
+  
+  // Categorize decisions by phase
+  const decisions = {
+    think: { title: "🧠 Scope & Core Goals", items: [] },
+    plan: { title: "📋 Implementation Plan", items: [] },
+    design: { title: "🎨 UI/UX Design System", items: [] },
+    build: { title: "💻 Code & Implementation", items: [] },
+    security_review: { title: "🛡️ Security & Compliance", items: [] },
+    research: { title: "🔍 Research & Discovery", items: [] }
+  };
+  
+  messages.forEach(msg => {
+    const phase = (msg.phase || "").toLowerCase();
+    const content = msg.content || "";
+    
+    // Extract key sentences
+    const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 12);
+    
+    sentences.forEach(sentence => {
+      const lower = sentence.toLowerCase();
+      if (
+        lower.includes("decid") || 
+        lower.includes("we will") || 
+        lower.includes("should use") || 
+        lower.includes("recommend") ||
+        lower.includes("plan to") ||
+        lower.includes("architect") ||
+        lower.includes("goal") ||
+        lower.includes("ux") ||
+        lower.includes("color") ||
+        lower.includes("layout") ||
+        lower.includes("library") ||
+        lower.includes("package") ||
+        lower.includes("vulnerab") ||
+        lower.includes("secure") ||
+        lower.includes("endpoint")
+      ) {
+        let targetPhase = "think";
+        if (phase === "plan" || lower.includes("step") || lower.includes("task") || lower.includes("plan")) targetPhase = "plan";
+        else if (phase === "design" || lower.includes("css") || lower.includes("style") || lower.includes("color") || lower.includes("font") || lower.includes("theme")) targetPhase = "design";
+        else if (phase === "build" || lower.includes("file") || lower.includes("code") || lower.includes("deliverable") || lower.includes("implement")) targetPhase = "build";
+        else if (phase === "security_review" || phase === "cso" || lower.includes("security") || lower.includes("stride") || lower.includes("vulnerability") || lower.includes("audit")) targetPhase = "security_review";
+        else if (phase === "research" || lower.includes("docs") || lower.includes("api") || lower.includes("research") || lower.includes("literature")) targetPhase = "research";
+        else targetPhase = phase || "think";
+        
+        if (!decisions[targetPhase]) {
+          decisions[targetPhase] = { title: `⚙️ ${targetPhase.toUpperCase()} Phase`, items: [] };
         }
         
-        renderedDebateCount = messages.length;
-        debateContainer.scrollTop = debateContainer.scrollHeight;
+        const formatted = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+        if (!decisions[targetPhase].items.includes(formatted) && decisions[targetPhase].items.length < 3) {
+          decisions[targetPhase].items.push(formatted);
+        }
       }
-      
-      const currentMsg = messages[messages.length - 1];
-      const stage = currentMsg.phase ? currentMsg.phase.toUpperCase() : "SPRINT";
-      activeAgentsLabel.textContent = `Active debate in [${stage}] phase...`;
-    } else {
-      if (renderedDebateCount !== 0) {
-        debateContainer.innerHTML = `
-          <div class="debate-placeholder-text">
-            Start a new sprint goal to watch the agents debate architectural specifications and security boundaries.
-          </div>
-        `;
-        renderedDebateCount = 0;
-      }
-      activeAgentsLabel.textContent = "Awaiting sprint...";
+    });
+  });
+  
+  let html = `
+    <div style="padding: 4px;">
+      <h3 style="margin-top: 0; margin-bottom: 12px; color: var(--color-cyan); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid rgba(6, 182, 212, 0.15); padding-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px; color: var(--color-cyan);"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>LIVE SPRINT DECISION LOG (DEBATED)</span>
+      </h3>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+  `;
+  
+  let hasDecisions = false;
+  Object.keys(decisions).forEach(key => {
+    const group = decisions[key];
+    if (group.items.length > 0) {
+      hasDecisions = true;
+      html += `
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 6px; padding: 8px 10px;">
+          <span style="font-size: 8.5px; font-weight: 700; color: var(--color-cyan); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">${group.title}</span>
+          <ul style="margin: 0; padding-left: 12px; color: rgba(255,255,255,0.75); font-size: 10px; line-height: 1.4;">
+            ${group.items.map(item => `<li style="margin-bottom: 3px;">${item}.</li>`).join("")}
+          </ul>
+        </div>
+      `;
     }
-  } catch (e) {
-    console.error("Error polling debate logs:", e);
+  });
+  
+  if (!hasDecisions) {
+    html += `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: rgba(255,255,255,0.4); text-align: center; gap: 8px;">
+        <div class="hud-status-dot pulse-dot" style="background-color: var(--color-cyan); width: 8px; height: 8px;"></div>
+        <span style="font-size: 10.5px;">Debate is active. Formulating technical decisions...</span>
+      </div>
+    `;
   }
+  
+  html += `
+      </div>
+    </div>
+  `;
+  
+  summaryEl.innerHTML = html;
 }
 
 async function fetchAgentLog() {
@@ -1026,9 +1229,11 @@ function updateUIState() {
 
   // Update Live Preview Iframe with Coder deliverable if available
   const deliverable = state.phases && state.phases.build && state.phases.build.deliverable;
+  const iframe = document.getElementById("live-preview-iframe");
+  const previewUrl = document.getElementById("live-preview-url");
+  const summaryEl = document.getElementById("live-preview-debate-summary");
+
   if (deliverable && deliverable.toLowerCase().endsWith(".html")) {
-    const iframe = document.getElementById("live-preview-iframe");
-    const previewUrl = document.getElementById("live-preview-url");
     if (iframe && previewUrl && iframe.src.indexOf(deliverable) === -1) {
       const url = workspaceFileUrl(deliverable);
       iframe.src = url;
@@ -1036,6 +1241,12 @@ function updateUIState() {
       // Auto-switch to Live Preview tab to show the user the live progress!
       switchTab("preview");
     }
+    if (iframe) iframe.style.display = "block";
+    if (summaryEl) summaryEl.style.display = "none";
+  } else {
+    if (iframe) iframe.style.display = "none";
+    if (summaryEl) summaryEl.style.display = "block";
+    if (previewUrl) previewUrl.textContent = "Awaiting Coder deliverable...";
   }
 
   // Update 3D Runway Text dynamically based on active sprint steps
@@ -1212,8 +1423,16 @@ function renderWorkspaceTree(files) {
 
 async function inspectFile(filename) {
   activeFile = filename;
-  previewFileTitle.textContent = `File Inspector: ${filename}`;
-  previewFileContent.textContent = "Loading file content...";
+  if (previewFileTitle) {
+    previewFileTitle.textContent = filename;
+  }
+  if (saveFileBtn) {
+    saveFileBtn.style.display = "block";
+  }
+  if (previewFileContent) {
+    previewFileContent.removeAttribute("readonly");
+    previewFileContent.value = "Loading file content...";
+  }
   
   // Re-render files to highlight active class selection
   fetchWorkspaceFiles();
@@ -1222,7 +1441,9 @@ async function inspectFile(filename) {
     const res = await fetch(`${API_BASE}/api/workspace/file?path=${encodeURIComponent(filename)}&_=${Date.now()}`);
     const data = await res.json();
     if (data && data.content) {
-      previewFileContent.textContent = data.content;
+      if (previewFileContent) {
+        previewFileContent.value = data.content;
+      }
       
       // If it's a HTML file, load it inside the live preview iframe!
       if (filename.toLowerCase().endsWith(".html")) {
@@ -1240,10 +1461,14 @@ async function inspectFile(filename) {
         switchTab("code");
       }
     } else {
-      previewFileContent.textContent = "Error: Could not read file content.";
+      if (previewFileContent) {
+        previewFileContent.value = "Error: Could not read file content.";
+      }
     }
   } catch (e) {
-    previewFileContent.textContent = `Error fetching file contents: ${e}`;
+    if (previewFileContent) {
+      previewFileContent.value = `Error fetching file contents: ${e}`;
+    }
   }
 }
 
@@ -1556,10 +1781,19 @@ async function handleResetDashboard() {
       await fetchWorkspaceFiles();
       
       // 3. Clear file inspector pre body
-      previewFileContent.textContent = "Select a file from the workspace above to inspect its code contents in real time.";
+      if (previewFileTitle) {
+        previewFileTitle.textContent = "Select a file to inspect";
+      }
+      if (saveFileBtn) {
+        saveFileBtn.style.display = "none";
+      }
+      if (previewFileContent) {
+        previewFileContent.setAttribute("readonly", "true");
+        previewFileContent.value = "Select a file from the workspace above to inspect its code contents in real time.";
+      }
       
-      // 4. Force reset nodes in the DOM to default state (first node think is active, others idle)
-      pipelineNodes.forEach((nodeEl, idx) => {
+      // 4. Force reset nodes in the DOM to default state (first node is active, others idle)
+      document.querySelectorAll("#pipeline-nodes-container .node-3d").forEach((nodeEl, idx) => {
         nodeEl.className = "node-3d";
         if (idx === 0) {
           nodeEl.classList.add("active", "active-tab");
@@ -1579,9 +1813,14 @@ async function handleResetDashboard() {
       // 6. Reset live preview iframe
       const iframe = document.getElementById("live-preview-iframe");
       const previewUrl = document.getElementById("live-preview-url");
+      const summaryEl = document.getElementById("live-preview-debate-summary");
       if (iframe && previewUrl) {
         iframe.src = "about:blank";
+        iframe.style.display = "none";
         previewUrl.textContent = "None";
+      }
+      if (summaryEl) {
+        summaryEl.style.display = "block";
       }
       
       alert("GStack workspace successfully reset back to original state!");
@@ -1599,9 +1838,639 @@ async function handleResetDashboard() {
   }
 }
 
+// Global workflow config state
+let globalStages = [];
+let globalCustomAgents = [];
+let phaseToAgentMap = {};
+
+function getPhaseIconSvg(phase) {
+  switch (phase) {
+    case "think":
+      return `<svg class="node-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>`;
+    case "plan":
+      return `<svg class="node-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg>`;
+    case "design":
+      return `<svg class="node-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+    case "build":
+      return `<svg class="node-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/><line x1="14" y1="4" x2="10" y2="20"/></svg>`;
+    case "review":
+      return `<svg class="node-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
+    case "test":
+      return `<svg class="node-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12"/><path d="M8 3v12a4 4 0 0 0 8 0V3"/><path d="M6 12h12"/></svg>`;
+    case "ship":
+      return `<svg class="node-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.5-2.5 3.5-2.5 5.5C4 22 6 21 7.5 19.5"/><path d="M12 12l9-9-9 9z"/><path d="M21 3c-3 0-8 3-10 5l-4 4c-2 2-3 5-3 5s1 1 1 1 3-1 5-3l4-4c2-2 5-7 5-10z"/></svg>`;
+    default:
+      return `<svg class="node-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`;
+  }
+}
+
+function getAgentIconSvg(agentKey) {
+  let phase = "default";
+  if (agentKey === "ceo") phase = "think";
+  else if (agentKey === "eng_manager") phase = "plan";
+  else if (agentKey === "designer") phase = "design";
+  else if (agentKey === "coder") phase = "build";
+  else if (agentKey === "qa_lead") phase = "test";
+  else if (agentKey === "release_engineer") phase = "ship";
+  
+  const svg = getPhaseIconSvg(phase);
+  return svg.replace('class="node-icon-svg"', 'class="node-icon-svg" style="width: 12px; height: 12px; margin-right: 6px; flex-shrink: 0;"');
+}
+
+function renderDraggableAgentsPool() {
+  const container = document.getElementById("draggable-agents-pool");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  
+  const baseAgents = [
+    { key: "ceo", name: "CEO Agent" },
+    { key: "eng_manager", name: "Eng Manager" },
+    { key: "designer", name: "Designer" },
+    { key: "coder", name: "Coder Agent" },
+    { key: "qa_lead", name: "QA Lead" },
+    { key: "release_engineer", name: "Release Eng" }
+  ];
+  
+  const allAgents = [...baseAgents];
+  globalCustomAgents.forEach(a => {
+    if (!allAgents.some(x => x.key === a.key)) {
+      allAgents.push({ key: a.key, name: a.name });
+    }
+  });
+  
+  allAgents.forEach(agent => {
+    const chip = document.createElement("div");
+    chip.className = "draggable-agent-chip";
+    chip.draggable = true;
+    chip.setAttribute("data-agent-key", agent.key);
+    
+    chip.style.cssText = "display: inline-flex; align-items: center; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 4px 8px; color: #fff; font-size: 10px; font-weight: 500; cursor: grab; user-select: none; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.15);";
+    
+    chip.innerHTML = getAgentIconSvg(agent.key) + `<span>${agent.name}</span>`;
+    
+    chip.addEventListener("dragstart", (e) => {
+      chip.classList.add("dragging");
+      document.body.classList.add("dragging-active");
+      e.dataTransfer.setData("text/plain", agent.key);
+      e.dataTransfer.effectAllowed = "copyMove";
+    });
+    
+    chip.addEventListener("dragend", () => {
+      chip.classList.remove("dragging");
+      document.body.classList.remove("dragging-active");
+    });
+    
+    container.appendChild(chip);
+  });
+}
+
+function assignAgentToPhase(phaseKey, agentKey) {
+  const stage = globalStages.find(s => s.phase === phaseKey);
+  if (!stage) return;
+  
+  const baseAgents = [
+    { key: "ceo", name: "CEO Agent" },
+    { key: "eng_manager", name: "Eng Manager" },
+    { key: "designer", name: "Designer" },
+    { key: "coder", name: "Coder Agent" },
+    { key: "qa_lead", name: "QA Lead" },
+    { key: "release_engineer", name: "Release Eng" }
+  ];
+  
+  const allAgents = [...baseAgents];
+  globalCustomAgents.forEach(a => {
+    if (!allAgents.some(x => x.key === a.key)) {
+      allAgents.push({ key: a.key, name: `${a.name} [Custom]` });
+    }
+  });
+  
+  const matchedAgent = allAgents.find(a => a.key === agentKey);
+  stage.agent = agentKey;
+  stage.sub = matchedAgent ? matchedAgent.name.replace(" [Custom]", "") : agentKey;
+  
+  saveWorkflowConfig();
+  renderWorkflowStagesUI();
+}
+
+async function fetchWorkflowConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/config/workflow?_=${Date.now()}`);
+    const data = await res.json();
+    if (data) {
+      globalStages = data.stages || [];
+      globalCustomAgents = data.custom_agents || [];
+      
+      // Update global phase order and details maps for active stages
+      const activeStages = globalStages.filter(s => s.active);
+      PHASE_ORDER = activeStages.map(s => s.phase);
+      
+      // Build details and mapping
+      phaseToAgentMap = {};
+      globalStages.forEach(s => {
+        // Build map for active ones
+        if (s.active) {
+          phaseToAgentMap[s.phase] = s.agent;
+        }
+        
+        // Build tooltip phase details
+        PHASE_DETAILS[s.phase] = {
+          label: s.label,
+          agent: s.sub || s.agent,
+          pending: `Will run the ${s.label} phase using the ${s.sub || s.agent} agent.`,
+          running: `${s.sub || s.agent} is executing the ${s.label} phase...`,
+          completed: `${s.sub || s.agent} completed the ${s.label} phase.`
+        };
+      });
+      
+      // 1. Render workflow stages checklist UI in Column 1
+      renderWorkflowStagesUI();
+      
+      // 2. Render timeline nodes in Column 2
+      renderTimelineNodesUI();
+      
+      // 3. Render draggable agent pool
+      renderDraggableAgentsPool();
+    }
+  } catch (e) {
+    console.error("Failed to fetch workflow config:", e);
+  }
+}
+
+function renderWorkflowStagesUI() {
+  const container = document.getElementById("workflow-stages-list");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  
+  // Available agents list
+  const baseAgents = [
+    { key: "ceo", name: "CEO Agent" },
+    { key: "eng_manager", name: "Eng Manager" },
+    { key: "designer", name: "Designer" },
+    { key: "coder", name: "Coder Agent" },
+    { key: "qa_lead", name: "QA Lead" },
+    { key: "release_engineer", name: "Release Eng" }
+  ];
+  
+  const allAgents = [...baseAgents];
+  globalCustomAgents.forEach(a => {
+    allAgents.push({ key: a.key, name: `${a.name} [Custom]` });
+  });
+  
+  // Populate the new custom stage form's agent select list if it exists
+  const customStageAgentSelect = document.getElementById("custom-stage-agent");
+  if (customStageAgentSelect) {
+    customStageAgentSelect.innerHTML = "";
+    allAgents.forEach(agent => {
+      const opt = document.createElement("option");
+      opt.value = agent.key;
+      opt.textContent = agent.name;
+      customStageAgentSelect.appendChild(opt);
+    });
+  }
+  
+  globalStages.forEach((s, idx) => {
+    const row = document.createElement("div");
+    row.className = "flex-row justify-between align-center gap-xs workflow-stage-row";
+    row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; border: 1px solid transparent; border-radius: 6px; padding: 4px; transition: all 0.2s ease;";
+    row.setAttribute("data-phase", s.phase);
+    
+    // Drag and drop event listeners
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      row.style.borderColor = "var(--color-cyan)";
+      row.style.boxShadow = "0 0 10px rgba(6, 182, 212, 0.4)";
+      row.style.background = "rgba(6, 182, 212, 0.08)";
+    });
+    row.addEventListener("dragleave", () => {
+      row.style.borderColor = "transparent";
+      row.style.boxShadow = "none";
+      row.style.background = "transparent";
+    });
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      row.style.borderColor = "transparent";
+      row.style.boxShadow = "none";
+      row.style.background = "transparent";
+      const agentKey = e.dataTransfer.getData("text/plain");
+      if (agentKey) {
+        assignAgentToPhase(s.phase, agentKey);
+      }
+    });
+    
+    // Left: checkbox + label
+    const leftDiv = document.createElement("div");
+    leftDiv.style.cssText = "display: flex; align-items: center; gap: 6px;";
+    
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = s.active;
+    checkbox.style.cssText = "width: 12px; height: 12px; cursor: pointer; accent-color: var(--color-cyan);";
+    checkbox.addEventListener("change", () => {
+      s.active = checkbox.checked;
+      saveWorkflowConfig();
+    });
+    
+    const labelSpan = document.createElement("span");
+    labelSpan.textContent = s.label;
+    labelSpan.style.cssText = "font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.85); font-family: var(--font-sans);";
+    
+    leftDiv.appendChild(checkbox);
+    leftDiv.appendChild(labelSpan);
+    
+    // Right controls container (select + reorder buttons)
+    const rightControls = document.createElement("div");
+    rightControls.style.cssText = "display: flex; align-items: center; gap: 4px;";
+    
+    // Dropdown select
+    const select = document.createElement("select");
+    select.className = "premium-input";
+    select.style.cssText = "font-size: 9px; height: 22px; padding: 2px 4px; width: 105px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); color: #fff; border-radius: 4px; outline: none; cursor: pointer;";
+    
+    allAgents.forEach(agent => {
+      const opt = document.createElement("option");
+      opt.value = agent.key;
+      opt.textContent = agent.name;
+      if (agent.key === s.agent) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    });
+    
+    select.addEventListener("change", () => {
+      s.agent = select.value;
+      const matchedAgent = allAgents.find(a => a.key === select.value);
+      s.sub = matchedAgent ? matchedAgent.name.split(" [")[0] : select.value;
+      saveWorkflowConfig();
+    });
+    
+    rightControls.appendChild(select);
+    
+    // Reordering actions
+    const upBtn = document.createElement("button");
+    upBtn.textContent = "▲";
+    upBtn.className = "glow-button secondary";
+    upBtn.style.cssText = "padding: 0; font-size: 7px; height: 16px; width: 16px; display: flex; align-items: center; justify-content: center; margin: 0;";
+    if (idx === 0) {
+      upBtn.style.opacity = "0.2";
+      upBtn.style.pointerEvents = "none";
+    } else {
+      upBtn.addEventListener("click", () => {
+        const temp = globalStages[idx];
+        globalStages[idx] = globalStages[idx - 1];
+        globalStages[idx - 1] = temp;
+        saveWorkflowConfig();
+        renderWorkflowStagesUI();
+      });
+    }
+    
+    const downBtn = document.createElement("button");
+    downBtn.textContent = "▼";
+    downBtn.className = "glow-button secondary";
+    downBtn.style.cssText = "padding: 0; font-size: 7px; height: 16px; width: 16px; display: flex; align-items: center; justify-content: center; margin: 0;";
+    if (idx === globalStages.length - 1) {
+      downBtn.style.opacity = "0.2";
+      downBtn.style.pointerEvents = "none";
+    } else {
+      downBtn.addEventListener("click", () => {
+        const temp = globalStages[idx];
+        globalStages[idx] = globalStages[idx + 1];
+        globalStages[idx + 1] = temp;
+        saveWorkflowConfig();
+        renderWorkflowStagesUI();
+      });
+    }
+    
+    rightControls.appendChild(upBtn);
+    rightControls.appendChild(downBtn);
+    
+    // Delete button for custom stages (only core ones are locked)
+    const isCorePhase = ["think", "plan", "design", "build", "review", "test", "ship"].includes(s.phase);
+    if (!isCorePhase) {
+      const delBtn = document.createElement("button");
+      delBtn.textContent = "✕";
+      delBtn.className = "glow-button secondary";
+      delBtn.style.cssText = "padding: 0; font-size: 8px; height: 16px; width: 16px; display: flex; align-items: center; justify-content: center; margin: 0; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #ef4444;";
+      delBtn.addEventListener("click", () => {
+        globalStages.splice(idx, 1);
+        saveWorkflowConfig();
+        renderWorkflowStagesUI();
+      });
+      rightControls.appendChild(delBtn);
+    }
+    
+    row.appendChild(leftDiv);
+    row.appendChild(rightControls);
+    container.appendChild(row);
+  });
+}
+
+function renderTimelineNodesUI() {
+  const container = document.getElementById("pipeline-nodes-container");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  
+  const activeStages = globalStages.filter(s => s.active);
+  activeStages.forEach(s => {
+    const node = document.createElement("div");
+    node.className = "node-3d";
+    node.setAttribute("data-agent", s.agent);
+    node.setAttribute("data-phase", s.phase);
+    node.id = `node-${s.phase}`;
+    if (s.agent === activeAgent) {
+      node.classList.add("active-tab");
+    }
+    
+    // Drag and drop event listeners
+    node.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      node.classList.add("drag-over");
+    });
+    node.addEventListener("dragleave", () => {
+      node.classList.remove("drag-over");
+    });
+    node.addEventListener("drop", (e) => {
+      e.preventDefault();
+      node.classList.remove("drag-over");
+      const agentKey = e.dataTransfer.getData("text/plain");
+      if (agentKey) {
+        assignAgentToPhase(s.phase, agentKey);
+      }
+    });
+    
+    const circle = document.createElement("div");
+    circle.className = "node-3d-circle";
+    circle.innerHTML = getPhaseIconSvg(s.phase) + `<div class="node-3d-badge" id="badge-${s.phase}"></div>`;
+    
+    const copy = document.createElement("div");
+    copy.className = "node-3d-copy";
+    
+    const label = document.createElement("div");
+    label.className = "node-3d-label";
+    label.textContent = s.label;
+    
+    const sub = document.createElement("div");
+    sub.className = "node-3d-sub";
+    sub.textContent = s.sub || s.agent;
+    
+    copy.appendChild(label);
+    copy.appendChild(sub);
+    node.appendChild(circle);
+    node.appendChild(copy);
+    
+    // Clickable tab switching listener
+    node.addEventListener("click", () => {
+      activeAgent = s.agent;
+      terminalName.textContent = `TERMINAL: ${activeAgent}_agent`;
+      
+      // Update visual active-tab class on all nodes
+      document.querySelectorAll("#pipeline-nodes-container .node-3d").forEach(n => n.classList.remove("active-tab"));
+      node.classList.add("active-tab");
+      
+      fetchAgentLog(); // Immediate fetch on switch
+    });
+    
+    container.appendChild(node);
+  });
+}
+
+async function saveWorkflowConfig() {
+  try {
+    await fetch(`${API_BASE}/api/config/workflow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stages: globalStages,
+        custom_agents: globalCustomAgents
+      })
+    });
+    
+    const activeStages = globalStages.filter(s => s.active);
+    PHASE_ORDER = activeStages.map(s => s.phase);
+    
+    phaseToAgentMap = {};
+    globalStages.forEach(s => {
+      if (s.active) {
+        phaseToAgentMap[s.phase] = s.agent;
+      }
+      PHASE_DETAILS[s.phase] = {
+        label: s.label,
+        agent: s.sub || s.agent,
+        pending: `Will run the ${s.label} phase using the ${s.sub || s.agent} agent.`,
+        running: `${s.sub || s.agent} is executing the ${s.label} phase...`,
+        completed: `${s.sub || s.agent} completed the ${s.label} phase.`
+      };
+    });
+    
+    renderTimelineNodesUI();
+    renderWorkflowStagesUI();
+    renderDraggableAgentsPool();
+  } catch (e) {
+    console.error("Failed to save workflow config:", e);
+  }
+}
+
+async function handleSaveCustomAgent() {
+  const keyInput = document.getElementById("custom-agent-key");
+  const nameInput = document.getElementById("custom-agent-name");
+  const subInput = document.getElementById("custom-agent-sub");
+  const promptInput = document.getElementById("custom-agent-prompt");
+  const btn = document.getElementById("custom-agent-save-btn");
+  
+  const key = keyInput.value.trim();
+  const name = nameInput.value.trim();
+  const sub = subInput.value.trim();
+  const prompt = promptInput.value.trim();
+  
+  if (!key || !name || !sub || !prompt) {
+    alert("Please fill in all custom agent fields.");
+    return;
+  }
+  
+  btn.disabled = true;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = "<span>Creating... ⚙️</span>";
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/config/agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, name, sub, prompt })
+    });
+    
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      alert(`Custom agent '${name}' created successfully! You can now select it for any workflow stage.`);
+      keyInput.value = "";
+      nameInput.value = "";
+      subInput.value = "";
+      promptInput.value = "";
+      
+      await fetchWorkflowConfig();
+    } else {
+      alert(`Failed to create custom agent: ${data.detail || data.message}`);
+    }
+  } catch (e) {
+    alert(`Error creating custom agent: ${e}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+async function handleAddCustomStage() {
+  const keyInput = document.getElementById("custom-stage-key");
+  const labelInput = document.getElementById("custom-stage-label");
+  const agentSelect = document.getElementById("custom-stage-agent");
+  const btn = document.getElementById("custom-stage-add-btn");
+  
+  if (!keyInput || !labelInput || !agentSelect || !btn) return;
+  
+  const phase = keyInput.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+  const label = labelInput.value.trim();
+  const agent = agentSelect.value;
+  
+  if (!phase || !label || !agent) {
+    alert("Please fill in all custom stage fields.");
+    return;
+  }
+  
+  // Verify the stage key is unique
+  if (globalStages.some(s => s.phase === phase)) {
+    alert(`Stage with phase key '${phase}' already exists in your workflow.`);
+    return;
+  }
+  
+  btn.disabled = true;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = "<span>Adding... ⚙️</span>";
+  
+  // Get description sub-label (e.g. Coder Agent)
+  const matchedText = agentSelect.options[agentSelect.selectedIndex].text;
+  const sub = matchedText.split(" [")[0];
+  
+  globalStages.push({
+    phase,
+    agent,
+    label,
+    sub,
+    active: true
+  });
+  
+  try {
+    await saveWorkflowConfig();
+    
+    alert(`Custom stage '${label}' successfully added to your pipeline!`);
+    
+    // Clear inputs
+    keyInput.value = "";
+    labelInput.value = "";
+    
+    // Re-fetch config to refresh everything
+    await fetchWorkflowConfig();
+  } catch (e) {
+    alert(`Error adding custom stage: ${e}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+async function fetchPresets() {
+  try {
+    const res = await fetch(`${API_BASE}/api/config/presets?_=${Date.now()}`);
+    const data = await res.json();
+    if (data && presetSelect) {
+      presetSelect.innerHTML = "";
+      Object.keys(data).forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        presetSelect.appendChild(opt);
+      });
+    }
+  } catch (e) {
+    console.error("Failed to fetch presets:", e);
+  }
+}
+
+async function handleLoadPreset() {
+  if (!presetSelect) return;
+  const name = presetSelect.value;
+  if (!name) return;
+  
+  if (!confirm(`Are you sure you want to load the team configuration preset '${name}'? This will overwrite your active workflow stages.`)) {
+    return;
+  }
+  
+  presetLoadBtn.disabled = true;
+  const originalText = presetLoadBtn.innerHTML;
+  presetLoadBtn.innerHTML = "<span>Loading... ⚙️</span>";
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/config/preset/load`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      alert(`Team configuration preset '${name}' loaded successfully!`);
+      await fetchWorkflowConfig();
+    } else {
+      alert(`Failed to load preset: ${data.detail || data.message}`);
+    }
+  } catch (e) {
+    alert(`Error loading preset: ${e}`);
+  } finally {
+    presetLoadBtn.disabled = false;
+    presetLoadBtn.innerHTML = originalText;
+  }
+}
+
+async function handleSavePreset() {
+  if (!presetNameInput || !presetSaveBtn) return;
+  const name = presetNameInput.value.trim();
+  if (!name) {
+    alert("Please enter a name for the new team configuration preset.");
+    return;
+  }
+  
+  presetSaveBtn.disabled = true;
+  const originalText = presetSaveBtn.innerHTML;
+  presetSaveBtn.innerHTML = "<span>Saving... ⚙️</span>";
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/config/preset`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, stages: globalStages })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      alert(`Team configuration preset '${name}' saved successfully!`);
+      presetNameInput.value = "";
+      await fetchPresets();
+      if (presetSelect) {
+        presetSelect.value = name;
+      }
+    } else {
+      alert(`Failed to save preset: ${data.detail || data.message}`);
+    }
+  } catch (e) {
+    alert(`Error saving preset: ${e}`);
+  } finally {
+    presetSaveBtn.disabled = false;
+    presetSaveBtn.innerHTML = originalText;
+  }
+}
+
 // Launch initialization
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initializeDashboard);
 } else {
   initializeDashboard();
 }
+

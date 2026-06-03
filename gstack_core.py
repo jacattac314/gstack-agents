@@ -282,7 +282,15 @@ def get_embedding(text: str) -> Optional[List[float]]:
         return None
 
 class QdrantClient:
-    def __init__(self, url: str = "http://localhost:6333", collection_name: str = "gstack_memory"):
+    def __init__(self, url: str = None, collection_name: str = "gstack_memory"):
+        if not url:
+            try:
+                config = load_provider_config()
+                url = config.get("qdrant_url")
+            except Exception:
+                pass
+            if not url:
+                url = os.environ.get("QDRANT_URL", "http://localhost:6333")
         self.url = url.rstrip("/")
         self.collection_name = collection_name
         
@@ -470,6 +478,7 @@ def load_provider_config() -> dict:
         "freellmapi_url": os.environ.get("FREELLMAPI_URL", "http://localhost:3001/v1"),
         "freellmapi_token": os.environ.get("FREELLMAPI_TOKEN", ""),
         "freellmapi_model": os.environ.get("FREELLMAPI_MODEL", "google/gemini-2.5-flash"),
+        "qdrant_url": os.environ.get("QDRANT_URL", "http://localhost:6333")
     }
     if os.path.exists(PROVIDER_CONFIG_PATH):
         try:
@@ -489,6 +498,42 @@ def save_provider_config(config: dict):
             json.dump(config, f, indent=2)
     except Exception as e:
         print(f"Error saving provider config: {e}")
+
+WORKFLOW_CONFIG_PATH = os.path.join(LOGS_DIR, "workflow_config.json")
+
+def load_workflow_config() -> dict:
+    default_config = {
+        "stages": [
+            {"phase": "think", "agent": "ceo", "label": "Think", "sub": "CEO Agent", "active": True},
+            {"phase": "plan", "agent": "eng_manager", "label": "Plan", "sub": "Eng Manager", "active": True},
+            {"phase": "design", "agent": "designer", "label": "Design", "sub": "Designer", "active": True},
+            {"phase": "build", "agent": "coder", "label": "Build", "sub": "Coder Agent", "active": True},
+            {"phase": "review", "agent": "release_engineer", "label": "Review", "sub": "Release Eng", "active": True},
+            {"phase": "test", "agent": "qa_lead", "label": "Test", "sub": "QA Lead", "active": True},
+            {"phase": "ship", "agent": "release_engineer", "label": "Ship", "sub": "Release Eng", "active": True}
+        ],
+        "custom_agents": []
+    }
+    if os.path.exists(WORKFLOW_CONFIG_PATH):
+        try:
+            with open(WORKFLOW_CONFIG_PATH, "r") as f:
+                config = json.load(f)
+                # Keep active/custom fields intact or append defaults
+                if "stages" not in config:
+                    config["stages"] = default_config["stages"]
+                if "custom_agents" not in config:
+                    config["custom_agents"] = default_config["custom_agents"]
+                return config
+        except Exception:
+            pass
+    return default_config
+
+def save_workflow_config(config: dict):
+    try:
+        with open(WORKFLOW_CONFIG_PATH, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        print(f"Error saving workflow config: {e}")
 
 # --------------------------------------------------------------------
 # 1. Model Resolver (Defensive local model selection)
@@ -1324,24 +1369,17 @@ async def run_phase_debate(phase_name: str, sprint_goal: str):
 # 5. Core Sprint Orchestrator
 # --------------------------------------------------------------------
 class GStackSprintOrchestrator:
-    def __init__(self, sprint_goal: str):
+    def __init__(self, sprint_goal: str, keep_workspace: bool = True):
         self.sprint_goal = sprint_goal
         self.sprint_goal_original = sprint_goal
+        self.keep_workspace = keep_workspace
         self.is_cancelled = False
         self.trace_id = generate_trace_id()
         self.state_file_path = os.path.join(LOGS_DIR, "sprint_state.json")
         self.state = {
             "goal": sprint_goal,
             "current_phase": "idle",
-            "phases": {
-                "think": {"status": "pending", "agent": "ceo", "summary": ""},
-                "plan": {"status": "pending", "agent": "eng_manager", "summary": ""},
-                "design": {"status": "pending", "agent": "designer", "summary": ""},
-                "build": {"status": "pending", "agent": "coder", "summary": ""},
-                "review": {"status": "pending", "agent": "release_engineer", "summary": ""},
-                "test": {"status": "pending", "agent": "qa_lead", "summary": ""},
-                "ship": {"status": "pending", "agent": "release_engineer", "summary": ""}
-            },
+            "phases": {},
             "metrics": {
                 "active_model": "",
                 "total_runs": 0,
@@ -1349,6 +1387,19 @@ class GStackSprintOrchestrator:
                 "latency_history": []
             }
         }
+        
+        # Build phases dynamically from active stages in workflow config
+        config = load_workflow_config()
+        for stage in config.get("stages", []):
+            if stage.get("active", True):
+                self.state["phases"][stage["phase"]] = {
+                    "status": "pending",
+                    "agent": stage["agent"],
+                    "summary": "",
+                    "label": stage["label"],
+                    "sub": stage["sub"]
+                }
+                
         self.load_state()
 
     def load_state(self):
@@ -1406,9 +1457,34 @@ class GStackSprintOrchestrator:
         self.save_state()
 
     async def run_sprint(self):
-        """Runs the entire GStack staged workflow with native OTel tracing."""
+        """Runs the entire GStack staged workflow dynamically configured by the user, with Otel tracing."""
         import time
         self.state["metrics"]["total_runs"] += 1
+
+        # If keeping workspace, check if there are existing files and inject them into the sprint goal context so agents are aware of them.
+        if self.keep_workspace:
+            try:
+                files = os.listdir(WORKSPACE_DIR)
+                files = [f for f in files if not f.startswith(".")]
+                if files:
+                    file_info = []
+                    for f in files:
+                        p = os.path.join(WORKSPACE_DIR, f)
+                        if os.path.isfile(p):
+                            size = os.path.getsize(p)
+                            file_info.append(f"- {f} ({size} bytes)")
+                    
+                    if file_info:
+                        files_context = (
+                            "\n=== INCREMENTAL SPRINT CONTEXT ===\n"
+                            "Note: This is an incremental sprint extending or updating an existing project in the workspace. "
+                            "You should update, rewrite, or build on top of the following existing files rather than ignoring them or starting entirely from scratch:\n"
+                            + "\n".join(file_info) +
+                            "\n===================================\n\n"
+                        )
+                        self.sprint_goal = files_context + self.sprint_goal
+            except Exception as e:
+                print(f"Error listing files for incremental sprint context: {e}")
         
         # Query memory bank for previous relevant sprints
         try:
@@ -1431,370 +1507,163 @@ class GStackSprintOrchestrator:
                     return f.read()
             return f"You are the {skill_name} agent."
 
-        # --------------------------------------------------
-        # Phase 1: Think (CEO)
-        # --------------------------------------------------
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-        await run_phase_debate("think", self.sprint_goal_original)
-        print("\n[Phase 1] Starting Think (CEO)...")
-        t0 = time.time()
-        t0_ns = time.time_ns()
-        phase_span_id = generate_span_id()
+        # Load active stages from workflow config
+        config = load_workflow_config()
+        active_stages = [stage for stage in config.get("stages", []) if stage.get("active", True)]
         
-        self.state["current_phase"] = "think"
-        self.state["phases"]["think"]["status"] = "running"
-        self.save_state()
+        summaries = {}
+        deliverable = None
         
-        ceo_system = load_skill_prompt("ceo")
-        ceo_summary = await execute_agent_with_tools("ceo", ceo_system, self.sprint_goal, trace_id=self.trace_id, parent_span_id=phase_span_id)
-        
-        t1 = time.time()
-        t1_ns = time.time_ns()
-        
-        global_tracer.add_span(
-            trace_id=self.trace_id,
-            span_id=phase_span_id,
-            name="phase.think",
-            start_time_ns=t0_ns,
-            end_time_ns=t1_ns,
-            attributes={"phase.name": "think", "agent.role": "ceo", "sprint.goal": self.sprint_goal},
-            status_code=3 if self.is_cancelled else 2
-        )
-        
-        if self.is_cancelled:
-            global_tracer.export()
-            return
+        for idx, stage in enumerate(active_stages):
+            phase = stage["phase"]
+            agent_key = stage["agent"]
+            label = stage["label"]
+            sub = stage["sub"]
             
-        self.state["phases"]["think"]["status"] = "completed"
-        self.state["phases"]["think"]["summary"] = ceo_summary
-        self.state["metrics"]["latency_history"].append({"phase": "think", "duration": round(t1 - t0, 1)})
-        self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
-        self.save_state()
-
-        # --------------------------------------------------
-        # Phase 2: Plan (Engineering Manager)
-        # --------------------------------------------------
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-        await run_phase_debate("plan", self.sprint_goal_original)
-        print("\n[Phase 2] Starting Plan (Engineering Manager)...")
-        t0 = time.time()
-        t0_ns = time.time_ns()
-        phase_span_id = generate_span_id()
-        
-        self.state["current_phase"] = "plan"
-        self.state["phases"]["plan"]["status"] = "running"
-        self.save_state()
-        
-        em_system = load_skill_prompt("eng_manager")
-        em_summary = await execute_agent_with_tools("eng_manager", em_system, f"Sprint Goal: {self.sprint_goal}\n\nCEO PRD:\n{ceo_summary}", trace_id=self.trace_id, parent_span_id=phase_span_id)
-        
-        t1 = time.time()
-        t1_ns = time.time_ns()
-        
-        global_tracer.add_span(
-            trace_id=self.trace_id,
-            span_id=phase_span_id,
-            name="phase.plan",
-            start_time_ns=t0_ns,
-            end_time_ns=t1_ns,
-            attributes={"phase.name": "plan", "agent.role": "eng_manager"},
-            status_code=3 if self.is_cancelled else 2
-        )
-        
-        if self.is_cancelled:
-            global_tracer.export()
-            return
+            if self.is_cancelled:
+                global_tracer.export()
+                return
+                
+            await run_phase_debate(phase, self.sprint_goal_original)
+            print(f"\n[{label} Stage] Starting {label} ({sub})...")
             
-        self.state["phases"]["plan"]["status"] = "completed"
-        self.state["phases"]["plan"]["summary"] = em_summary
-        self.state["metrics"]["latency_history"].append({"phase": "plan", "duration": round(t1 - t0, 1)})
-        self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
-        self.save_state()
-        self.notify_completion("planning_completed", em_summary)
-
-        # --------------------------------------------------
-        # Phase 3: Design (Designer)
-        # --------------------------------------------------
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-        await run_phase_debate("design", self.sprint_goal_original)
-        print("\n[Phase 3] Starting Design (Designer)...")
-        t0 = time.time()
-        t0_ns = time.time_ns()
-        phase_span_id = generate_span_id()
-        
-        self.state["current_phase"] = "design"
-        self.state["phases"]["design"]["status"] = "running"
-        self.save_state()
-        
-        designer_system = load_skill_prompt("designer")
-        designer_summary = await execute_agent_with_tools("designer", designer_system, f"Sprint Goal: {self.sprint_goal}\n\nTech Spec Plan:\n{em_summary}", trace_id=self.trace_id, parent_span_id=phase_span_id)
-        
-        t1 = time.time()
-        t1_ns = time.time_ns()
-        
-        global_tracer.add_span(
-            trace_id=self.trace_id,
-            span_id=phase_span_id,
-            name="phase.design",
-            start_time_ns=t0_ns,
-            end_time_ns=t1_ns,
-            attributes={"phase.name": "design", "agent.role": "designer"},
-            status_code=3 if self.is_cancelled else 2
-        )
-        
-        if self.is_cancelled:
-            global_tracer.export()
-            return
+            t0 = time.time()
+            t0_ns = time.time_ns()
+            phase_span_id = generate_span_id()
             
-        self.state["phases"]["design"]["status"] = "completed"
-        self.state["phases"]["design"]["summary"] = designer_summary
-        self.state["metrics"]["latency_history"].append({"phase": "design", "duration": round(t1 - t0, 1)})
-        self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
-        self.save_state()
-
-        # --------------------------------------------------
-        # Phase 4: Build (Coder)
-        # --------------------------------------------------
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-        await run_phase_debate("build", self.sprint_goal_original)
-        print("\n[Phase 4] Starting Build (Coder)...")
-        t0 = time.time()
-        t0_ns = time.time_ns()
-        phase_span_id = generate_span_id()
-        
-        self.state["current_phase"] = "build"
-        self.state["phases"]["build"]["status"] = "running"
-        self.save_state()
-        
-        coder_system = load_skill_prompt("coder")
-
-        PROTECTED = {"server.py", "gstack_core.py", "index.html", "index.css",
-                     "app.js", "requirements.txt"}
-
-        def _workspace_snapshot():
-            snap = {}
-            for f in os.listdir(WORKSPACE_DIR):
-                p = os.path.join(WORKSPACE_DIR, f)
-                if os.path.isfile(p):
-                    snap[f] = os.path.getsize(p)
-            return snap
-
-        before = _workspace_snapshot()
-
-        coder_summary = ""
-        max_build_attempts = 3
-        for attempt in range(max_build_attempts):
-            extra = "" if attempt == 0 else (
-                "\n\nIMPORTANT: The previous attempt did NOT write any runnable file. "
-                "You MUST emit a <write_file path=\"...\">...full code...</write_file> tag "
-                "with the COMPLETE contents now. Do not just describe it."
-            )
-            coder_summary = await execute_agent_with_tools(
-                "coder", coder_system,
-                f"Sprint Goal: {self.sprint_goal}\n\nTech Specs:\n{em_summary}\n\n"
-                f"Design Styles:\n{designer_summary}{extra}",
-                trace_id=self.trace_id, parent_span_id=phase_span_id
-            )
-
-            after = _workspace_snapshot()
-            new_files = [f for f in after
-                         if f not in PROTECTED and not f.lower().endswith(".md")
-                         and (f not in before or after[f] != before.get(f))
-                         and after[f] > 0]
-            if new_files:
-                self.state["phases"]["build"]["deliverable"] = new_files[0]
-                break
-        else:
-            self.state["phases"]["build"]["status"] = "failed"
-            self.state["phases"]["build"]["error"] = (
-                "Coder produced no runnable file (likely emitted prose instead of a "
-                "<write_file> tag). Deliverable missing."
-            )
+            self.state["current_phase"] = phase
+            self.state["phases"][phase]["status"] = "running"
             self.save_state()
-
-        t1 = time.time()
-        t1_ns = time.time_ns()
-        
-        global_tracer.add_span(
-            trace_id=self.trace_id,
-            span_id=phase_span_id,
-            name="phase.build",
-            start_time_ns=t0_ns,
-            end_time_ns=t1_ns,
-            attributes={"phase.name": "build", "agent.role": "coder"},
-            status_code=3 if self.state["phases"]["build"]["status"] == "failed" else 2
-        )
-
-        if self.state["phases"]["build"]["status"] == "failed":
-            self.state["current_phase"] = "failed"
+            
+            agent_system = load_skill_prompt(agent_key)
+            
+            # Construct input prompt dynamically based on previous stages
+            if idx == 0:
+                input_prompt = self.sprint_goal
+            else:
+                input_prompt = f"Sprint Goal: {self.sprint_goal}\n\n"
+                for prev_phase, prev_summary in summaries.items():
+                    input_prompt += f"Previous Stage [{prev_phase}] Output:\n{prev_summary}\n\n"
+            
+            # Custom phase logics
+            if phase == "build":
+                PROTECTED = {"server.py", "gstack_core.py", "index.html", "index.css", "app.js", "requirements.txt"}
+                def _workspace_snapshot():
+                    snap = {}
+                    for f in os.listdir(WORKSPACE_DIR):
+                        p = os.path.join(WORKSPACE_DIR, f)
+                        if os.path.isfile(p):
+                            snap[f] = os.path.getsize(p)
+                    return snap
+                    
+                before = _workspace_snapshot()
+                coder_summary = ""
+                max_build_attempts = 3
+                for attempt in range(max_build_attempts):
+                    extra = "" if attempt == 0 else (
+                        "\n\nIMPORTANT: The previous attempt did NOT write any runnable file. "
+                        "You MUST emit a <write_file path=\"...\">...full code...</write_file> tag "
+                        "with the COMPLETE contents now. Do not just describe it."
+                    )
+                    coder_summary = await execute_agent_with_tools(
+                        agent_key, agent_system,
+                        input_prompt + extra,
+                        trace_id=self.trace_id, parent_span_id=phase_span_id
+                    )
+                    after = _workspace_snapshot()
+                    new_files = [f for f in after
+                                 if f not in PROTECTED and not f.lower().endswith(".md")
+                                 and (f not in before or after[f] != before.get(f))
+                                 and after[f] > 0]
+                    if new_files:
+                        deliverable = new_files[0]
+                        self.state["phases"]["build"]["deliverable"] = deliverable
+                        break
+                else:
+                    self.state["phases"]["build"]["status"] = "failed"
+                    self.state["phases"]["build"]["error"] = (
+                        "Coder produced no runnable file (likely emitted prose instead of a "
+                        "<write_file> tag). Deliverable missing."
+                    )
+                    self.save_state()
+                
+                summary_output = coder_summary
+                
+            elif phase == "test":
+                qa_summary = await execute_agent_with_tools(
+                    agent_key, agent_system,
+                    input_prompt,
+                    trace_id=self.trace_id, parent_span_id=phase_span_id
+                )
+                
+                if deliverable:
+                    print(f"\n[Visual QA] Hooked into Test Phase. Running Visual QA on: {deliverable}")
+                    plan_summary = summaries.get("plan", "")
+                    qa_ok, visual_qa_log = await run_autonomous_visual_qa(deliverable, plan_summary)
+                    qa_summary += f"\n\n=== AUTONOMOUS VISUAL QA REPORT ===\n"
+                    qa_summary += f"Status: {'PASSED' if qa_ok else 'FAILED_BUT_REPAIRED'}\n"
+                    qa_summary += f"{visual_qa_log}\n==================================="
+                summary_output = qa_summary
+                
+            else:
+                summary_output = await execute_agent_with_tools(
+                    agent_key, agent_system,
+                    input_prompt,
+                    trace_id=self.trace_id, parent_span_id=phase_span_id
+                )
+            
+            t1 = time.time()
+            t1_ns = time.time_ns()
+            
+            status_code = 2
+            if phase == "build" and self.state["phases"]["build"]["status"] == "failed":
+                status_code = 3
+                
+            global_tracer.add_span(
+                trace_id=self.trace_id,
+                span_id=phase_span_id,
+                name=f"phase.{phase}",
+                start_time_ns=t0_ns,
+                end_time_ns=t1_ns,
+                attributes={"phase.name": phase, "agent.role": agent_key},
+                status_code=3 if self.is_cancelled else status_code
+            )
+            
+            if phase == "build" and self.state["phases"]["build"]["status"] == "failed":
+                self.state["current_phase"] = "failed"
+                self.save_state()
+                print("\n❌ Build failed. Stopping sprint execution.")
+                self.notify_completion("failed", "Build phase failed because the coder did not produce a valid deliverable file.")
+                global_tracer.export()
+                return
+                
+            if self.is_cancelled:
+                global_tracer.export()
+                return
+                
+            self.state["phases"][phase]["status"] = "completed"
+            self.state["phases"][phase]["summary"] = summary_output
+            self.state["metrics"]["latency_history"].append({"phase": phase, "duration": round(t1 - t0, 1)})
+            self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
             self.save_state()
-            print("\n❌ Build failed. Stopping sprint execution.")
-            self.notify_completion("failed", "Build phase failed because the coder did not produce a valid deliverable file.")
-            global_tracer.export()
-            return
-
-        if self.is_cancelled:
-            global_tracer.export()
-            return
             
-        self.state["phases"]["build"]["status"] = "completed"
-        self.state["phases"]["build"]["summary"] = coder_summary
-        self.state["metrics"]["latency_history"].append({"phase": "build", "duration": round(t1 - t0, 1)})
-        self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
-        self.save_state()
-        self.notify_completion("build_completed", coder_summary)
-
-        # --------------------------------------------------
-        # Phase 5: Review (Release Engineer)
-        # --------------------------------------------------
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-        await run_phase_debate("review", self.sprint_goal_original)
-        print("\n[Phase 5] Starting Review (Release Engineer)...")
-        t0 = time.time()
-        t0_ns = time.time_ns()
-        phase_span_id = generate_span_id()
-        
-        self.state["current_phase"] = "review"
-        self.state["phases"]["review"]["status"] = "running"
-        self.save_state()
-        
-        re_system = load_skill_prompt("release_engineer")
-        re_summary = await execute_agent_with_tools("release_engineer", re_system, f"Sprint Goal: {self.sprint_goal}\n\nCoder Output:\n{coder_summary}", trace_id=self.trace_id, parent_span_id=phase_span_id)
-        
-        t1 = time.time()
-        t1_ns = time.time_ns()
-        
-        global_tracer.add_span(
-            trace_id=self.trace_id,
-            span_id=phase_span_id,
-            name="phase.review",
-            start_time_ns=t0_ns,
-            end_time_ns=t1_ns,
-            attributes={"phase.name": "review", "agent.role": "release_engineer"},
-            status_code=3 if self.is_cancelled else 2
-        )
-        
-        if self.is_cancelled:
-            global_tracer.export()
-            return
+            summaries[phase] = summary_output
             
-        self.state["phases"]["review"]["status"] = "completed"
-        self.state["phases"]["review"]["summary"] = re_summary
-        self.state["metrics"]["latency_history"].append({"phase": "review", "duration": round(t1 - t0, 1)})
-        self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
-        self.save_state()
-
-        # --------------------------------------------------
-        # Phase 6: Test (QA Lead)
-        # --------------------------------------------------
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-        await run_phase_debate("test", self.sprint_goal_original)
-        print("\n[Phase 6] Starting Test (QA Lead)...")
-        t0 = time.time()
-        t0_ns = time.time_ns()
-        phase_span_id = generate_span_id()
+            if phase == "plan":
+                self.notify_completion("planning_completed", summary_output)
+            elif phase == "build":
+                self.notify_completion("build_completed", summary_output)
         
-        self.state["current_phase"] = "test"
-        self.state["phases"]["test"]["status"] = "running"
-        self.save_state()
-        
-        qa_system = load_skill_prompt("qa_lead")
-        qa_summary = await execute_agent_with_tools("qa_lead", qa_system, f"Sprint Goal: {self.sprint_goal}\n\nCoder Output:\n{coder_summary}", trace_id=self.trace_id, parent_span_id=phase_span_id)
-        
-        # Call Autonomous Visual QA Engine on the Coder's deliverable
-        deliverable = self.state["phases"]["build"].get("deliverable")
-        if deliverable:
-            print(f"\n[Visual QA] Hooked into Test Phase. Running Visual QA on: {deliverable}")
-            qa_ok, visual_qa_log = await run_autonomous_visual_qa(deliverable, em_summary)
-            qa_summary += f"\n\n=== AUTONOMOUS VISUAL QA REPORT ===\n"
-            qa_summary += f"Status: {'PASSED' if qa_ok else 'FAILED_BUT_REPAIRED'}\n"
-            qa_summary += f"{visual_qa_log}\n==================================="
-        
-        t1 = time.time()
-        t1_ns = time.time_ns()
-        
-        global_tracer.add_span(
-            trace_id=self.trace_id,
-            span_id=phase_span_id,
-            name="phase.test",
-            start_time_ns=t0_ns,
-            end_time_ns=t1_ns,
-            attributes={"phase.name": "test", "agent.role": "qa_lead"},
-            status_code=3 if self.is_cancelled else 2
-        )
-        
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-            
-        self.state["phases"]["test"]["status"] = "completed"
-        self.state["phases"]["test"]["summary"] = qa_summary
-        self.state["metrics"]["latency_history"].append({"phase": "test", "duration": round(t1 - t0, 1)})
-        self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
-        self.save_state()
-
-        # --------------------------------------------------
-        # Phase 7: Ship (Release Engineer)
-        # --------------------------------------------------
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-        await run_phase_debate("ship", self.sprint_goal_original)
-        print("\n[Phase 7] Starting Ship (Release Engineer)...")
-        t0 = time.time()
-        t0_ns = time.time_ns()
-        phase_span_id = generate_span_id()
-        
-        self.state["current_phase"] = "ship"
-        self.state["phases"]["ship"]["status"] = "running"
-        self.save_state()
-        
-        ship_summary = await execute_agent_with_tools("release_engineer", re_system, f"Sprint Goal: {self.sprint_goal}\n\nReview Notes:\n{re_summary}\n\nQA Test Notes:\n{qa_summary}\n\nEverything is approved. Build is verified. Compile the final release notes and ship the project.", trace_id=self.trace_id, parent_span_id=phase_span_id)
-        
-        t1 = time.time()
-        t1_ns = time.time_ns()
-        
-        global_tracer.add_span(
-            trace_id=self.trace_id,
-            span_id=phase_span_id,
-            name="phase.ship",
-            start_time_ns=t0_ns,
-            end_time_ns=t1_ns,
-            attributes={"phase.name": "ship", "agent.role": "release_engineer"},
-            status_code=3 if self.is_cancelled else 2
-        )
-        
-        if self.is_cancelled:
-            global_tracer.export()
-            return
-            
-        self.state["phases"]["ship"]["status"] = "completed"
-        self.state["phases"]["ship"]["summary"] = ship_summary
-        self.state["metrics"]["latency_history"].append({"phase": "ship", "duration": round(t1 - t0, 1)})
-        self.state["metrics"]["accumulated_savings"] += round((t1 - t0) * 0.015, 3)
         self.state["current_phase"] = "completed"
         self.save_state()
         
         print("\n✅ GStack Sprint completed successfully!")
-        deliverable_file = self.state["phases"]["build"].get("deliverable")
-        self.notify_completion("completed", ship_summary, deliverable=deliverable_file)
+        ship_summary = summaries.get("ship", summaries.get(active_stages[-1]["phase"], "Sprint finished successfully."))
+        self.notify_completion("completed", ship_summary, deliverable=deliverable)
         
-        # Save completion summary to Memory Bank
         try:
-            memory_content = f"Sprint Goal: {self.sprint_goal_original}\nDeliverable: {deliverable_file}\nRelease Summary: {ship_summary}"
-            global_memory.add_memory(memory_content, {"goal": self.sprint_goal_original, "deliverable": deliverable_file})
+            memory_content = f"Sprint Goal: {self.sprint_goal_original}\nDeliverable: {deliverable}\nRelease Summary: {ship_summary}"
+            global_memory.add_memory(memory_content, {"goal": self.sprint_goal_original, "deliverable": deliverable})
         except Exception as e:
             print(f"Error saving to memory bank: {e}")
             

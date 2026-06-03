@@ -1,0 +1,454 @@
+{
+  "Default GStack": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Think",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Plan",
+      "sub": "Eng Manager",
+      "active": true
+    },
+    {
+      "phase": "design",
+      "agent": "designer",
+      "label": "Design",
+      "sub": "Designer",
+      "active": true
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Build",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "review",
+      "agent": "release_engineer",
+      "label": "Review",
+      "sub": "Release Eng",
+      "active": true
+    },
+    {
+      "phase": "test",
+      "agent": "qa_lead",
+      "label": "Test",
+      "sub": "QA Lead",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship",
+      "sub": "Release Eng",
+      "active": true
+    }
+  ],
+  "Security First Team": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Think",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Plan",
+      "sub": "Eng Manager",
+      "active": true
+    },
+    {
+      "phase": "design",
+      "agent": "designer",
+      "label": "Design",
+      "sub": "Designer",
+      "active": true
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Build",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "security_review",
+      "agent": "security_auditor",
+      "label": "Security Review",
+      "sub": "Security Auditor",
+      "active": true
+    },
+    {
+      "phase": "review",
+      "agent": "release_engineer",
+      "label": "Review",
+      "sub": "Release Eng",
+      "active": true
+    },
+    {
+      "phase": "test",
+      "agent": "qa_lead",
+      "label": "Test",
+      "sub": "QA Lead",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship",
+      "sub": "Release Eng",
+      "active": true
+    }
+  ],
+  "Lean Startup Team": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Think",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Plan",
+      "sub": "Eng Manager",
+      "active": false
+    },
+    {
+      "phase": "design",
+      "agent": "designer",
+      "label": "Design",
+      "sub": "Designer",
+      "active": false
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Build",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "review",
+      "agent": "release_engineer",
+      "label": "Review",
+      "sub": "Release Eng",
+      "active": false
+    },
+    {
+      "phase": "test",
+      "agent": "qa_lead",
+      "label": "Test",
+      "sub": "QA Lead",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship",
+      "sub": "Release Eng",
+      "active": true
+    }
+  ],
+  "Design-First UI/UX Team": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Think",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "design",
+      "agent": "designer",
+      "label": "UI/UX Design",
+      "sub": "Designer",
+      "active": true
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Frontend Build",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "visual_review",
+      "agent": "design_qa",
+      "label": "Visual Review",
+      "sub": "Design QA Specialist",
+      "active": true
+    },
+    {
+      "phase": "test",
+      "agent": "qa_lead",
+      "label": "UX Testing",
+      "sub": "QA Lead",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship",
+      "sub": "Release Eng",
+      "active": true
+    }
+  ],
+  "Research & Discovery Team": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Outline Goals",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "research",
+      "agent": "researcher",
+      "label": "Market Research",
+      "sub": "Researcher",
+      "active": true
+    },
+    {
+      "phase": "architect",
+      "agent": "architect",
+      "label": "System Architecture",
+      "sub": "Technical Architect",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Formulate Spec",
+      "sub": "Eng Manager",
+      "active": true
+    }
+  ],
+  "DevOps & ReAct Orchestration Team": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Outline Goals",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Technical Planning",
+      "sub": "Eng Manager",
+      "active": true
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Code Generation",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "compilation_verify",
+      "agent": "hermes",
+      "label": "CLI Compilation & Audit",
+      "sub": "Hermes Agent",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship & Deploy",
+      "sub": "Release Eng",
+      "active": true
+    }
+  ],
+  "Gstack and Hermes": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Think",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Plan",
+      "sub": "Eng Manager",
+      "active": true
+    },
+    {
+      "phase": "setup",
+      "agent": "hermes",
+      "label": "Dependency Management & Setup",
+      "sub": "Hermes Agent",
+      "active": true
+    },
+    {
+      "phase": "design",
+      "agent": "designer",
+      "label": "Design",
+      "sub": "Designer",
+      "active": true
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Build",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "compilation_verify",
+      "agent": "hermes",
+      "label": "CLI Compilation & Build Audit",
+      "sub": "Hermes Agent",
+      "active": true
+    },
+    {
+      "phase": "test",
+      "agent": "qa_lead",
+      "label": "Test",
+      "sub": "QA Lead",
+      "active": true
+    },
+    {
+      "phase": "test_orchestration",
+      "agent": "hermes",
+      "label": "Automated Test Orchestration",
+      "sub": "Hermes Agent",
+      "active": true
+    },
+    {
+      "phase": "review",
+      "agent": "release_engineer",
+      "label": "Review",
+      "sub": "Release Eng",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship",
+      "sub": "Release Eng",
+      "active": true
+    }
+  ],
+  "Research Team": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Outline Goals",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "research",
+      "agent": "researcher",
+      "label": "Market Research",
+      "sub": "Researcher",
+      "active": true
+    },
+    {
+      "phase": "architect",
+      "agent": "architect",
+      "label": "System Architecture",
+      "sub": "Technical Architect",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Formulate Spec",
+      "sub": "Eng Manager",
+      "active": true
+    }
+  ],
+  "Enterprise End-to-End App Team": [
+    {
+      "phase": "think",
+      "agent": "ceo",
+      "label": "Think",
+      "sub": "CEO Agent",
+      "active": true
+    },
+    {
+      "phase": "plan",
+      "agent": "eng_manager",
+      "label": "Plan",
+      "sub": "Eng Manager",
+      "active": true
+    },
+    {
+      "phase": "architecture",
+      "agent": "architect",
+      "label": "Architecture",
+      "sub": "Technical Architect",
+      "active": true
+    },
+    {
+      "phase": "design",
+      "agent": "designer",
+      "label": "Design",
+      "sub": "Designer",
+      "active": true
+    },
+    {
+      "phase": "design_qa",
+      "agent": "design_qa",
+      "label": "Design QA",
+      "sub": "Design QA Specialist",
+      "active": true
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Build",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "security_audit",
+      "agent": "security_auditor",
+      "label": "Security Audit",
+      "sub": "Security Auditor",
+      "active": true
+    },
+    {
+      "phase": "review",
+      "agent": "release_engineer",
+      "label": "Review",
+      "sub": "Release Eng",
+      "active": true
+    },
+    {
+      "phase": "test",
+      "agent": "qa_lead",
+      "label": "Test",
+      "sub": "QA Lead",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship",
+      "sub": "Release Eng",
+      "active": true
+    },
+    {
+      "phase": "continuous_improvement",
+      "agent": "hermes",
+      "label": "Continuous Improvement",
+      "sub": "Hermes Agent",
+      "active": true
+    }
+  ]
+}

@@ -1106,9 +1106,17 @@ body {
   line-height: 1.5;
   color: #93C5FD;
   overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
+  word-wrap: normal;
   flex-grow: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  caret-color: var(--color-cyan);
+}
+.code-viewer-body:focus {
+  outline: none;
 }
 
 /* ====================================================================
@@ -1745,4 +1753,33 @@ body {
 }
 .debate-message.release_engineer .debate-msg-content {
   border-left: 2.5px solid #8b5cf6;
+}
+
+/* Drag and Drop Custom Styles */
+.draggable-agent-chip {
+  cursor: grab !important;
+  user-select: none;
+}
+.draggable-agent-chip:active {
+  cursor: grabbing !important;
+}
+.draggable-agent-chip.dragging {
+  opacity: 0.4;
+  border-color: var(--color-cyan) !important;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+}
+.draggable-agent-chip:hover {
+  background: rgba(255,255,255,0.12) !important;
+  border-color: rgba(255,255,255,0.2) !important;
+}
+.node-3d.drag-over {
+  border-color: var(--color-cyan) !important;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.7) !important;
+  background: rgba(6, 182, 212, 0.12) !important;
+  transform: scale(1.02);
+}
+
+.dragging-active .workflow-stage-row *,
+.dragging-active .node-3d * {
+  pointer-events: none;
 }

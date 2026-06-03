@@ -84,11 +84,11 @@ def run_git_with_github_token(args, username: str, token: str, cwd: str, env: di
     )
 
 # Helper to run the sprint in background
-def run_sprint_background(goal: str):
+def run_sprint_background(goal: str, keep_workspace: bool):
     global active_sprint_task
     import asyncio
     try:
-        orchestrator = GStackSprintOrchestrator(goal)
+        orchestrator = GStackSprintOrchestrator(goal, keep_workspace=keep_workspace)
         active_sprint_task = orchestrator
         asyncio.run(orchestrator.run_sprint())
     except Exception as e:
@@ -403,12 +403,28 @@ async def api_github_sync(payload: dict):
 async def api_sprint_start(payload: dict, background_tasks: BackgroundTasks):
     global active_sprint_task
     goal = payload.get("goal")
+    keep_workspace = payload.get("keep_workspace", True)
     if not goal:
         raise HTTPException(status_code=400, detail="Missing 'goal' in payload")
         
     if active_sprint_task is not None:
         return {"status": "error", "message": "A sprint is already running!"}
         
+    # If not keeping workspace, clear it
+    if not keep_workspace:
+        try:
+            if os.path.exists(WORKSPACE_DIR):
+                for filename in os.listdir(WORKSPACE_DIR):
+                    if filename.startswith("."):
+                        continue
+                    file_path = os.path.join(WORKSPACE_DIR, filename)
+                    if os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                    else:
+                        os.remove(file_path)
+        except Exception as e:
+            print(f"Error clearing workspace for fresh sprint: {e}")
+            
     # Reset existing logs to prevent flash of old content
     for agent in ["ceo", "eng_manager", "designer", "coder", "qa_lead", "release_engineer"]:
         log_path = os.path.join(LOGS_DIR, f"{agent}.log")
@@ -435,7 +451,7 @@ async def api_sprint_start(payload: dict, background_tasks: BackgroundTasks):
             pass
             
     # Trigger sprint in background
-    background_tasks.add_task(run_sprint_background, goal)
+    background_tasks.add_task(run_sprint_background, goal, keep_workspace)
     return {"status": "success", "message": "GStack sprint triggered successfully in background."}
 
 @app.post("/api/sprint/reset")
@@ -692,6 +708,179 @@ async def api_workspace_file(path: str = Query(..., description="Filename to rea
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/workspace/file")
+async def api_workspace_file_save(payload: dict):
+    path = payload.get("path")
+    content = payload.get("content")
+    if not path:
+        raise HTTPException(status_code=400, detail="Missing 'path'")
+    if content is None:
+        raise HTTPException(status_code=400, detail="Missing 'content'")
+        
+    safe_path = os.path.join(WORKSPACE_DIR, os.path.basename(path))
+    try:
+        with open(safe_path, 'w') as f:
+            f.write(content)
+        return {"status": "success", "message": "File saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/config/workflow")
+async def api_get_workflow_config():
+    from gstack_core import load_workflow_config
+    return load_workflow_config()
+
+@app.post("/api/config/workflow")
+async def api_post_workflow_config(payload: dict):
+    from gstack_core import save_workflow_config
+    save_workflow_config(payload)
+    return {"status": "success", "message": "Workflow configuration updated successfully."}
+
+@app.get("/api/config/presets")
+async def api_get_presets():
+    """Retrieves all saved team configuration presets."""
+    try:
+        from gstack_core import LOGS_DIR
+        presets_path = os.path.join(LOGS_DIR, "workflow_presets.json")
+        if os.path.exists(presets_path):
+            with open(presets_path, "r") as f:
+                return json.load(f)
+        return {
+            "Default GStack": [
+                {"phase": "think", "agent": "ceo", "label": "Think", "sub": "CEO Agent", "active": True},
+                {"phase": "plan", "agent": "eng_manager", "label": "Plan", "sub": "Eng Manager", "active": True},
+                {"phase": "design", "agent": "designer", "label": "Design", "sub": "Designer", "active": True},
+                {"phase": "build", "agent": "coder", "label": "Build", "sub": "Coder Agent", "active": True},
+                {"phase": "review", "agent": "release_engineer", "label": "Review", "sub": "Release Eng", "active": True},
+                {"phase": "test", "agent": "qa_lead", "label": "Test", "sub": "QA Lead", "active": True},
+                {"phase": "ship", "agent": "release_engineer", "label": "Ship", "sub": "Release Eng", "active": True}
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/config/preset")
+async def api_post_preset(payload: dict):
+    """Saves a new team configuration preset."""
+    try:
+        name = payload.get("name")
+        stages = payload.get("stages")
+        if not name or not stages:
+            raise HTTPException(status_code=400, detail="Missing name or stages in payload")
+            
+        from gstack_core import LOGS_DIR
+        presets_path = os.path.join(LOGS_DIR, "workflow_presets.json")
+        
+        presets = {}
+        if os.path.exists(presets_path):
+            try:
+                with open(presets_path, "r") as f:
+                    presets = json.load(f)
+            except Exception:
+                pass
+                
+        presets[name] = stages
+        
+        with open(presets_path, "w") as f:
+            json.dump(presets, f, indent=2)
+            
+        return {"status": "success", "message": f"Preset '{name}' saved successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/config/preset/load")
+async def api_load_preset(payload: dict):
+    """Loads a saved team configuration preset, applying it to the active workflow."""
+    try:
+        name = payload.get("name")
+        if not name:
+            raise HTTPException(status_code=400, detail="Missing name in payload")
+            
+        from gstack_core import LOGS_DIR, load_workflow_config, save_workflow_config
+        presets_path = os.path.join(LOGS_DIR, "workflow_presets.json")
+        
+        presets = {}
+        if os.path.exists(presets_path):
+            try:
+                with open(presets_path, "r") as f:
+                    presets = json.load(f)
+            except Exception:
+                pass
+                
+        if name not in presets and name != "Default GStack":
+            raise HTTPException(status_code=404, detail=f"Preset '{name}' not found")
+            
+        target_stages = presets.get(name)
+        if name == "Default GStack":
+            target_stages = [
+                {"phase": "think", "agent": "ceo", "label": "Think", "sub": "CEO Agent", "active": True},
+                {"phase": "plan", "agent": "eng_manager", "label": "Plan", "sub": "Eng Manager", "active": True},
+                {"phase": "design", "agent": "designer", "label": "Design", "sub": "Designer", "active": True},
+                {"phase": "build", "agent": "coder", "label": "Build", "sub": "Coder Agent", "active": True},
+                {"phase": "review", "agent": "release_engineer", "label": "Review", "sub": "Release Eng", "active": True},
+                {"phase": "test", "agent": "qa_lead", "label": "Test", "sub": "QA Lead", "active": True},
+                {"phase": "ship", "agent": "release_engineer", "label": "Ship", "sub": "Release Eng", "active": True}
+            ]
+            
+        config = load_workflow_config()
+        config["stages"] = target_stages
+        save_workflow_config(config)
+        
+        return {"status": "success", "message": f"Preset '{name}' loaded successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/config/agent")
+async def api_post_custom_agent(payload: dict):
+    from gstack_core import load_workflow_config, save_workflow_config, SKILLS_DIR
+    key = payload.get("key")
+    name = payload.get("name")
+    sub = payload.get("sub")
+    prompt = payload.get("prompt")
+    
+    if not key or not name or not sub or not prompt:
+        raise HTTPException(status_code=400, detail="Missing key, name, sub, or prompt in payload")
+        
+    # Standardize key names
+    key = re.sub(r"[^a-z0-9_]", "", key.lower().strip())
+    if not key:
+        raise HTTPException(status_code=400, detail="Invalid key format")
+        
+    # Create the skill folder and write SKILL.md
+    agent_skill_dir = os.path.join(SKILLS_DIR, key)
+    os.makedirs(agent_skill_dir, exist_ok=True)
+    skill_file_path = os.path.join(agent_skill_dir, "SKILL.md")
+    
+    try:
+        with open(skill_file_path, "w") as f:
+            f.write(prompt)
+            
+        # Update workflow_config
+        config = load_workflow_config()
+        # Check if agent already exists in custom_agents
+        custom_agents = config.get("custom_agents", [])
+        exists = False
+        for a in custom_agents:
+            if a.get("key") == key:
+                a["name"] = name
+                a["sub"] = sub
+                a["prompt"] = prompt
+                exists = True
+                break
+        if not exists:
+            custom_agents.append({
+                "key": key,
+                "name": name,
+                "sub": sub,
+                "prompt": prompt
+            })
+        config["custom_agents"] = custom_agents
+        save_workflow_config(config)
+        
+        return {"status": "success", "message": f"Custom agent '{name}' successfully created and saved!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/health")
 async def api_health():
     return {"status": "ok"}
@@ -712,12 +901,14 @@ async def api_post_provider_config(payload: dict):
         freellmapi_url = payload.get("freellmapi_url", "http://localhost:3001/v1")
         freellmapi_token = payload.get("freellmapi_token", "")
         freellmapi_model = payload.get("freellmapi_model", "google/gemini-2.5-flash")
+        qdrant_url = payload.get("qdrant_url", "http://localhost:6333")
         
         config = {
             "provider": provider,
             "freellmapi_url": freellmapi_url,
             "freellmapi_token": freellmapi_token,
-            "freellmapi_model": freellmapi_model
+            "freellmapi_model": freellmapi_model,
+            "qdrant_url": qdrant_url
         }
         
         save_provider_config(config)
