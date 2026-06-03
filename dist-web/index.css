@@ -1197,7 +1197,12 @@ body {
 }
 .dashboard-grid.drawer-collapsed {
   grid-template-columns: 0px 1fr 340px;
-  gap: 24px;
+}
+.dashboard-grid.inspector-collapsed {
+  grid-template-columns: 340px 1fr 0px;
+}
+.dashboard-grid.drawer-collapsed.inspector-collapsed {
+  grid-template-columns: 0px 1fr 0px;
 }
 
 /* Left Drawer Slide & Fade */
@@ -1209,6 +1214,21 @@ body {
   width: 340px;
 }
 .dashboard-grid.drawer-collapsed .left-drawer {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  width: 0;
+}
+
+/* Right Inspector Slide & Fade */
+.right-inspector {
+  transition: opacity var(--transition-fast), visibility var(--transition-fast), width var(--transition-normal);
+  opacity: 1;
+  visibility: visible;
+  overflow: hidden;
+  width: 340px;
+}
+.dashboard-grid.inspector-collapsed .right-inspector {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;

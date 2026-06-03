@@ -81,6 +81,7 @@ const sprintActionBtn = document.getElementById("sprint-action-btn");
 const sprintLaunchAppBtn = document.getElementById("sprint-launch-app-btn");
 const sprintClearBtn = document.getElementById("sprint-clear-btn");
 const drawerToggleBtn = document.getElementById("drawer-toggle-btn");
+const inspectorToggleBtn = document.getElementById("inspector-toggle-btn");
 
 const providerSelect = document.getElementById("provider-select");
 const freellmapiConfigSection = document.getElementById("freellmapi-config-section");
@@ -299,6 +300,14 @@ function setupEventListeners() {
     const isCollapsed = gridContainer.classList.contains("drawer-collapsed");
     drawerToggleBtn.textContent = isCollapsed ? "▶" : "◀";
     drawerToggleBtn.title = isCollapsed ? "Show Control Panel" : "Hide Control Panel";
+  });
+
+  // Collapsible Workspace Inspector Toggle
+  inspectorToggleBtn.addEventListener("click", () => {
+    gridContainer.classList.toggle("inspector-collapsed");
+    const isCollapsed = gridContainer.classList.contains("inspector-collapsed");
+    inspectorToggleBtn.textContent = isCollapsed ? "◀" : "▶";
+    inspectorToggleBtn.title = isCollapsed ? "Show Workspace Inspector" : "Hide Workspace Inspector";
   });
 
   // Clickable Pipeline Nodes Tab Switching
