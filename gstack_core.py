@@ -9,6 +9,8 @@ from typing import Dict, Any, List, Tuple
 import secrets
 import time
 import threading
+import html
+
 
 def generate_trace_id() -> str:
     return secrets.token_hex(16)
@@ -113,10 +115,13 @@ from typing import Optional, Literal
 
 class AgentAction(BaseModel):
     thought: str = Field(..., description="Explain the reasoning behind this action.")
-    tool: Literal["list_directory", "read_file", "write_file", "run_command", "finish"] = Field(..., description="The name of the tool to invoke.")
+    tool: Literal["list_directory", "read_file", "write_file", "run_command", "web_search", "fetch_webpage", "finish"] = Field(..., description="The name of the tool to invoke.")
     path: Optional[str] = Field(None, description="The target file path for read_file or write_file.")
     content: Optional[str] = Field(None, description="The complete file content to write when using write_file.")
     command: Optional[str] = Field(None, description="The shell command string to run when using run_command.")
+    query: Optional[str] = Field(None, description="The search query string for web_search.")
+    url: Optional[str] = Field(None, description="The target URL for fetch_webpage.")
+
 
 def parse_agent_action(text: str) -> AgentAction:
     """Resiliently extracts and parses an AgentAction Pydantic model from model text."""
@@ -881,6 +886,106 @@ async def tool_run_command(command: str) -> str:
     except Exception as e:
         return f"Error executing command: {e}"
 
+def tool_web_search(query: str) -> str:
+    """Search the web/internet using DuckDuckGo to find websites, references, documentation, or code snippets."""
+    url = "https://lite.duckduckgo.com/lite/"
+    data = urllib.parse.urlencode({"q": query}).encode("utf-8")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    try:
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=8) as response:
+            html_content = response.read().decode("utf-8", errors="ignore")
+            
+        links_matches = re.findall(r'<a[^>]+href="([^"]+)"[^+]+class=[\'"]result-link[\'"][^>]*>([\s\S]*?)</a>', html_content)
+        if not links_matches:
+            # Fallback in case class order differs
+            links_matches = re.findall(r'<a[^>]+class=[\'"]result-link[\'"][^>]+href="([^"]+)"[^>]*>([\s\S]*?)</a>', html_content)
+        if not links_matches:
+            # Broader fallback
+            links_matches = re.findall(r'<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)</a>', html_content)
+            # Filter non-ddg links
+            links_matches = [(l, t) for l, t in links_matches if not any(x in l for x in ["duckduckgo.com", "javascript:", "#"])]
+            
+        snippets_matches = re.findall(r'<td[^>]+class=[\'"]result-snippet[\'"][^>]*>([\s\S]*?)</td>', html_content)
+        
+        results = []
+        for idx, (link, title) in enumerate(links_matches[:6]):
+            title_clean = re.sub(r'<[^>]*>', '', title).strip()
+            title_clean = html.unescape(title_clean)
+            
+            if link.startswith("//"):
+                link = "https:" + link
+            elif link.startswith("/"):
+                link = "https://lite.duckduckgo.com" + link
+                
+            snippet_clean = ""
+            if idx < len(snippets_matches):
+                snippet_clean = re.sub(r'<[^>]*>', '', snippets_matches[idx]).strip()
+                snippet_clean = html.unescape(snippet_clean)
+                
+            results.append(f"[{idx+1}] {title_clean}\n    URL: {link}\n    Snippet: {snippet_clean}")
+            
+        if not results:
+            return "No results found."
+            
+        return "\n\n".join(results)
+    except Exception as e:
+        return f"Error performing search: {e}"
+
+def tool_fetch_webpage(url: str) -> str:
+    """Fetch the cleaned text/markdown content of a website or webpage URL."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = "https://" + url
+            
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            content_type = response.info().get_content_type()
+            if "text/html" not in content_type and "text/plain" not in content_type:
+                return f"Error: Unsupported content type: {content_type}"
+            raw_data = response.read()
+            html_content = raw_data.decode("utf-8", errors="ignore")
+            
+        if "text/plain" in content_type:
+            return html_content
+            
+        html_content = re.sub(r'<head[\s\S]*?</head>', '', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'<script[\s\S]*?</script>', '', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'<style[\s\S]*?</style>', '', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'<!--[\s\S]*?-->', '', html_content)
+        
+        html_content = re.sub(r'<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)</a>', r'[\2](\1)', html_content)
+        html_content = re.sub(r'<h[1-6][^>]*>([\s\S]*?)</h[1-6]>', r'\n\n# \1\n', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'<li[^>]*>([\s\S]*?)</li>', r'\n* \1', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'<p[^>]*>([\s\S]*?)</p>', r'\n\n\1\n', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'<br\s*/?>', r'\n', html_content, flags=re.IGNORECASE)
+        
+        text = re.sub(r'<[^>]*>', '', html_content)
+        
+        lines = [line.strip() for line in text.splitlines()]
+        cleaned_lines = []
+        for line in lines:
+            if line:
+                cleaned_lines.append(line)
+            elif not cleaned_lines or cleaned_lines[-1] != "":
+                cleaned_lines.append("")
+                
+        cleaned_text = "\n".join(cleaned_lines).strip()
+        cleaned_text = html.unescape(cleaned_text)
+        
+        if len(cleaned_text) > 8000:
+            return cleaned_text[:8000] + "\n\n... [Content Truncated for Length] ..."
+        return cleaned_text
+        
+    except Exception as e:
+        return f"Error fetching page: {e}"
+
 # --------------------------------------------------------------------
 # 4. XML ReAct Loop Parser
 # --------------------------------------------------------------------
@@ -903,17 +1008,21 @@ async def execute_agent_with_tools(role_name: str, system_prompt: str, user_prom
         "Available Schema (AgentAction):\n"
         "{\n"
         "  \"thought\": \"Detailed explanation of your reasoning behind this action.\",\n"
-        "  \"tool\": \"list_directory\" | \"read_file\" | \"write_file\" | \"run_command\" | \"finish\",\n"
+        "  \"tool\": \"list_directory\" | \"read_file\" | \"write_file\" | \"run_command\" | \"web_search\" | \"fetch_webpage\" | \"finish\",\n"
         "  \"path\": \"optional target file path (for read_file or write_file)\",\n"
         "  \"content\": \"optional complete file contents (for write_file)\",\n"
-        "  \"command\": \"optional terminal shell command string (for run_command)\"\n"
+        "  \"command\": \"optional terminal shell command string (for run_command)\",\n"
+        "  \"query\": \"optional search query string (for web_search)\",\n"
+        "  \"url\": \"optional target URL (for fetch_webpage)\"\n"
         "}\n\n"
         "Available Tools:\n"
         "1. list_directory: Lists files in the active workspace.\n"
         "2. read_file: Reads a file from workspace (requires 'path').\n"
         "3. write_file: Writes complete file contents to workspace (requires 'path' and 'content').\n"
         "4. run_command: Runs a terminal shell command in the workspace (requires 'command').\n"
-        "5. finish: Concludes your agent turn and summarizes final findings.\n\n"
+        "5. web_search: Search the web/internet using DuckDuckGo to find websites, references, documentation, or code snippets (requires 'query').\n"
+        "6. fetch_webpage: Fetch the cleaned text/markdown content of a website or webpage URL (requires 'url').\n"
+        "7. finish: Concludes your agent turn and summarizes final findings.\n\n"
         "Rule: Output your action in EXACT JSON structure inside markdown. Never output multiple JSON blocks. When complete, use 'finish'.\n\n"
         "==================================================\n"
         "🚨 DELIVERY CONTRACT (CRITICAL RULES FOR EVERY SPRINT):\n"
@@ -1062,7 +1171,51 @@ async def execute_agent_with_tools(role_name: str, system_prompt: str, user_prom
             conversation_history += f"\n\n[Tool Executed]: run_command (\"{command}\")\n[Result]:\n{result}"
             tool_executed = True
             
-        # 5. finish
+        # 5. web_search
+        elif action.tool == "web_search":
+            query = action.query or ""
+            if not query:
+                result = "Error: Missing 'query' parameter for web_search."
+            else:
+                result = tool_web_search(query)
+                
+            tool_end = time.time_ns()
+            global_tracer.add_span(
+                trace_id=trace_id,
+                span_id=tool_span_id,
+                name="tool.web_search",
+                start_time_ns=tool_start,
+                end_time_ns=tool_end,
+                parent_span_id=turn_span_id,
+                attributes={"tool.name": "web_search", "tool.input": query, "tool.output": result},
+                status_code=3 if result.startswith("Error:") else 2
+            )
+            conversation_history += f"\n\n[Tool Executed]: web_search (query=\"{query}\")\n[Result]:\n{result}"
+            tool_executed = True
+            
+        # 6. fetch_webpage
+        elif action.tool == "fetch_webpage":
+            url = action.url or ""
+            if not url:
+                result = "Error: Missing 'url' parameter for fetch_webpage."
+            else:
+                result = tool_fetch_webpage(url)
+                
+            tool_end = time.time_ns()
+            global_tracer.add_span(
+                trace_id=trace_id,
+                span_id=tool_span_id,
+                name="tool.fetch_webpage",
+                start_time_ns=tool_start,
+                end_time_ns=tool_end,
+                parent_span_id=turn_span_id,
+                attributes={"tool.name": "fetch_webpage", "tool.input": url, "tool.output": result},
+                status_code=3 if result.startswith("Error:") else 2
+            )
+            conversation_history += f"\n\n[Tool Executed]: fetch_webpage (url=\"{url}\")\n[Result]:\n{result}"
+            tool_executed = True
+            
+        # 7. finish
         elif action.tool == "finish":
             tool_end = time.time_ns()
             global_tracer.add_span(
@@ -1667,4 +1820,104 @@ class GStackSprintOrchestrator:
         except Exception as e:
             print(f"Error saving to memory bank: {e}")
             
+        # Dynamic Prompt Evolution
+        try:
+            print("\n📈 [Dynamic Prompt Evolution] Initiating background prompt optimization task...")
+            await self.run_dynamic_prompt_evolution(active_stages, ship_summary, deliverable)
+        except Exception as e:
+            print(f"[Dynamic Prompt Evolution] Error running optimization task: {e}")
+            
         global_tracer.export()
+
+    async def run_dynamic_prompt_evolution(self, active_stages: list, ship_summary: str, deliverable: str):
+        """Analyzes logs of participating agents and refactors their system prompts based on sprint outcome."""
+        from gstack_core import chat_local_model, SKILLS_DIR, LOGS_DIR
+        
+        # Check if the sprint succeeded
+        sprint_success = (self.state.get("phases", {}).get("build", {}).get("status") != "failed")
+        
+        for stage in active_stages:
+            agent_key = stage["agent"]
+            
+            # Read current prompt
+            prompt_path = os.path.join(SKILLS_DIR, agent_key, "SKILL.md")
+            if not os.path.exists(prompt_path):
+                continue
+                
+            try:
+                with open(prompt_path, "r") as f:
+                    current_prompt = f.read()
+            except Exception as e:
+                print(f"[Dynamic Prompt Evolution] Error reading prompt for {agent_key}: {e}")
+                continue
+                
+            # Read agent execution logs
+            log_path = os.path.join(LOGS_DIR, f"{agent_key}.log")
+            agent_logs = ""
+            if os.path.exists(log_path):
+                try:
+                    with open(log_path, "r") as f:
+                        agent_logs = f.read()
+                    # Truncate if extremely long to fit LLM context window
+                    if len(agent_logs) > 6000:
+                        agent_logs = "... [Truncated] ...\n" + agent_logs[-6000:]
+                except Exception:
+                    pass
+            
+            user_prompt = (
+                f"Sprint Goal: {self.sprint_goal_original}\n"
+                f"Deliverable File: {deliverable or 'None'}\n"
+                f"Sprint Success Status: {sprint_success}\n"
+                f"Sprint Summary: {ship_summary}\n\n"
+                f"=== AGENT ROLE KEY: {agent_key} ===\n"
+                f"=== CURRENT SYSTEM PROMPT ===\n"
+                f"{current_prompt}\n\n"
+                f"=== AGENT RUNTIME EXECUTION LOGS ===\n"
+                f"{agent_logs or 'No logs available.'}\n"
+            )
+            
+            meta_system_prompt = (
+                "You are a Meta-Prompt Optimizer. Your job is to optimize and refine an AI agent's system prompt "
+                "based on the results and logs of a completed engineering sprint.\n\n"
+                "You will be provided with:\n"
+                "1. The original Sprint Goal.\n"
+                "2. The overall Sprint Outcome (Success/Failure and Summary).\n"
+                "3. The Agent's current system prompt.\n"
+                "4. The Agent's execution log from this sprint.\n\n"
+                "Your objective:\n"
+                "Analyze the logs to see if the agent made mistakes, did not follow instructions, or could perform better "
+                "with clearer guidelines. If so, write an updated, improved version of the system prompt. "
+                "Integrate specific 'lessons learned' as guidelines so the agent avoids these mistakes in the future.\n\n"
+                "Guidelines for the updated prompt:\n"
+                "- Retain all core responsibilities and skills of the agent.\n"
+                "- Add clear, concise, actionable guidelines (e.g. under a 'Lessons Learned' or 'Guidelines' section).\n"
+                "- Keep the prompt professional, clean, and direct.\n"
+                "- If the agent performed perfectly and no prompt change is required, return the exact original prompt.\n\n"
+                "Respond ONLY with the complete updated system prompt. Do not include markdown code block fences (like ```markdown), "
+                "explanations, or comments."
+            )
+            
+            try:
+                optimized_prompt = await chat_local_model(
+                    meta_system_prompt, 
+                    user_prompt, 
+                    role_name="debate_generator" # Use Tier 2 operation route
+                )
+                
+                optimized_prompt = optimized_prompt.strip()
+                
+                if optimized_prompt.startswith("```"):
+                    lines = optimized_prompt.splitlines()
+                    if lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].strip() == "```":
+                        lines = lines[:-1]
+                    optimized_prompt = "\n".join(lines).strip()
+                
+                if optimized_prompt and optimized_prompt != current_prompt.strip():
+                    with open(prompt_path, "w") as f:
+                        f.write(optimized_prompt)
+                    print(f"📈 [Dynamic Prompt Evolution] Successfully optimized and updated SKILL prompt for agent: {agent_key}")
+            except Exception as e:
+                print(f"[Dynamic Prompt Evolution] Error optimizing prompt for {agent_key}: {e}")
+
