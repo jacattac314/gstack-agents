@@ -104,6 +104,9 @@ const previewFileTitle = document.getElementById("preview-file-title");
 const previewFileContent = document.getElementById("preview-file-content");
 const saveFileBtn = document.getElementById("save-file-btn");
 const keepWorkspaceCheckbox = document.getElementById("keep-workspace-checkbox");
+const inspectorIterateSection = document.getElementById("inspector-iterate-section");
+const iterateFeedback = document.getElementById("iterate-feedback");
+const iterateSubmitBtn = document.getElementById("iterate-submit-btn");
 
 const metricRuns = document.getElementById("metric-runs");
 const metricSavings = document.getElementById("metric-savings");
@@ -420,6 +423,35 @@ function setupEventListeners() {
       window.open(`${API_BASE}/workspace/app/index.html`, "_blank");
     }
   });
+
+  // Iterate with Agents Submit Button
+  if (iterateSubmitBtn && iterateFeedback) {
+    iterateSubmitBtn.addEventListener("click", async () => {
+      const feedbackText = iterateFeedback.value.trim();
+      if (!feedbackText) {
+        alert("Please enter feedback describing what you want to change first.");
+        return;
+      }
+      if (!activeFile) {
+        alert("No file is selected to iterate on.");
+        return;
+      }
+      
+      // Update composer input value with custom iteration instructions
+      composerTextarea.value = `Iterate on workspace file '${activeFile}'. Feedback / requested changes:\n${feedbackText}\n\nMake sure to read '${activeFile}' first using read_file, update the code inline, and write it back to the same path '${activeFile}' using write_file.`;
+      
+      // Force keeping workspace files
+      if (keepWorkspaceCheckbox) {
+        keepWorkspaceCheckbox.checked = true;
+      }
+      
+      // Clear feedback textarea
+      iterateFeedback.value = "";
+      
+      // Trigger the sprint launch
+      await handleSprintAction();
+    });
+  }
 
   // Reset Dashboard Button
   if (sprintClearBtn) {
@@ -1211,7 +1243,7 @@ function updateUIState() {
   }
 
   // 2. Sprint Action Toggle Button State
-  if (state.current_phase === "idle" || state.current_phase === "completed" || state.current_phase === "cancelled") {
+  if (state.current_phase === "idle" || state.current_phase === "completed" || state.current_phase === "cancelled" || state.current_phase === "failed") {
     sprintActionBtn.disabled = false;
     sprintActionBtn.className = "glow-button";
     updateSprintButtonState("Launch Sprint ⚡");
@@ -1437,6 +1469,12 @@ async function inspectFile(filename) {
   if (saveFileBtn) {
     saveFileBtn.style.display = "block";
   }
+  if (inspectorIterateSection) {
+    inspectorIterateSection.style.display = "flex";
+  }
+  if (iterateFeedback) {
+    iterateFeedback.placeholder = `Describe the changes or refinements you want the agents to make to ${filename}...`;
+  }
   if (previewFileContent) {
     previewFileContent.removeAttribute("readonly");
     previewFileContent.value = "Loading file content...";
@@ -1583,7 +1621,7 @@ function renderLatencyChart(history) {
 }
 
 async function handleSprintAction() {
-  if (state.current_phase === "idle" || state.current_phase === "completed" || state.current_phase === "cancelled") {
+  if (state.current_phase === "idle" || state.current_phase === "completed" || state.current_phase === "cancelled" || state.current_phase === "failed") {
     await launchSprint();
   } else {
     await stopSprint();
@@ -1794,6 +1832,9 @@ async function handleResetDashboard() {
       }
       if (saveFileBtn) {
         saveFileBtn.style.display = "none";
+      }
+      if (inspectorIterateSection) {
+        inspectorIterateSection.style.display = "none";
       }
       if (previewFileContent) {
         previewFileContent.setAttribute("readonly", "true");
