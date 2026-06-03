@@ -3,29 +3,57 @@
     {
       "phase": "think",
       "agent": "ceo",
-      "label": "Outline Goals",
+      "label": "Think",
       "sub": "CEO Agent",
-      "active": true
-    },
-    {
-      "phase": "research",
-      "agent": "researcher",
-      "label": "Market Research",
-      "sub": "Researcher",
-      "active": true
-    },
-    {
-      "phase": "architect",
-      "agent": "architect",
-      "label": "System Architecture",
-      "sub": "Technical Architect",
       "active": true
     },
     {
       "phase": "plan",
       "agent": "eng_manager",
-      "label": "Formulate Spec",
+      "label": "Plan",
       "sub": "Eng Manager",
+      "active": true
+    },
+    {
+      "phase": "design",
+      "agent": "designer",
+      "label": "Design",
+      "sub": "Designer",
+      "active": true
+    },
+    {
+      "phase": "build",
+      "agent": "coder",
+      "label": "Build",
+      "sub": "Coder Agent",
+      "active": true
+    },
+    {
+      "phase": "security_review",
+      "agent": "security_auditor",
+      "label": "Security Review",
+      "sub": "Security Auditor",
+      "active": true
+    },
+    {
+      "phase": "review",
+      "agent": "release_engineer",
+      "label": "Review",
+      "sub": "Release Eng",
+      "active": true
+    },
+    {
+      "phase": "test",
+      "agent": "qa_lead",
+      "label": "Test",
+      "sub": "QA Lead",
+      "active": true
+    },
+    {
+      "phase": "ship",
+      "agent": "release_engineer",
+      "label": "Ship",
+      "sub": "Release Eng",
       "active": true
     }
   ],

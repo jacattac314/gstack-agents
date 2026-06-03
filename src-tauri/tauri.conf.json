@@ -3,7 +3,7 @@
     "distDir": "../dist-web",
     "devPath": "http://localhost:8000",
     "beforeDevCommand": "",
-    "beforeBuildCommand": ""
+    "beforeBuildCommand": "mkdir -p dist-web && cp index.html index.css app.js dist-web/"
   },
   "package": {
     "productName": "gStack",

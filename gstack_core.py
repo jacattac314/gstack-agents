@@ -1230,6 +1230,13 @@ async def execute_agent_with_tools(role_name: str, system_prompt: str, user_prom
             )
             tool_executed = False
             
+        if tool_executed and log_path:
+            try:
+                with open(log_path, "a") as f:
+                    f.write(f"\n[Tool Executed]: {action.tool}\n[Result]:\n{result}\n")
+            except Exception:
+                pass
+            
         turn_end = time.time_ns()
         active_config = load_provider_config()
         if active_config.get("provider") in ["freellmapi", "cloud_first"]:
@@ -1787,6 +1794,19 @@ class GStackSprintOrchestrator:
                 self.save_state()
                 print("\n❌ Build failed. Stopping sprint execution.")
                 self.notify_completion("failed", "Build phase failed because the coder did not produce a valid deliverable file.")
+                
+                # Dynamic Prompt Evolution on Failure
+                try:
+                    print("\n📈 [Dynamic Prompt Evolution] Initiating background prompt optimization task due to build failure...")
+                    run_stages = active_stages[:active_stages.index(stage)+1] if stage in active_stages else active_stages
+                    await self.run_dynamic_prompt_evolution(
+                        run_stages, 
+                        "Build phase failed because the coder did not produce a valid deliverable file.", 
+                        None
+                    )
+                except Exception as e:
+                    print(f"[Dynamic Prompt Evolution] Error running optimization task on failure: {e}")
+                    
                 global_tracer.export()
                 return
                 
@@ -1906,13 +1926,23 @@ class GStackSprintOrchestrator:
                 
                 optimized_prompt = optimized_prompt.strip()
                 
-                if optimized_prompt.startswith("```"):
-                    lines = optimized_prompt.splitlines()
-                    if lines[0].startswith("```"):
-                        lines = lines[1:]
-                    if lines and lines[-1].strip() == "```":
-                        lines = lines[:-1]
-                    optimized_prompt = "\n".join(lines).strip()
+                # Robust extraction of markdown block contents using regex
+                import re
+                code_block_match = re.search(r'```(?:markdown|md)?\n(.*?)\n```', optimized_prompt, re.DOTALL | re.IGNORECASE)
+                if code_block_match:
+                    optimized_prompt = code_block_match.group(1).strip()
+                else:
+                    code_block_match2 = re.search(r'```\n(.*?)\n```', optimized_prompt, re.DOTALL)
+                    if code_block_match2:
+                        optimized_prompt = code_block_match2.group(1).strip()
+                    elif optimized_prompt.startswith("```"):
+                        # Fallback simple splitlines if formatting was slightly off
+                        lines = optimized_prompt.splitlines()
+                        if lines[0].startswith("```"):
+                            lines = lines[1:]
+                        if lines and lines[-1].strip() == "```":
+                            lines = lines[:-1]
+                        optimized_prompt = "\n".join(lines).strip()
                 
                 if optimized_prompt and optimized_prompt != current_prompt.strip():
                     with open(prompt_path, "w") as f:

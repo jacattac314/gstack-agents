@@ -1010,14 +1010,19 @@ async def api_generate_team(payload: dict):
 
     try:
         llm_response = await chat_local_model(system_prompt, user_prompt, role_name="debate_generator")
-        clean_response = llm_response.strip()
-        if clean_response.startswith("```"):
-            lines = clean_response.splitlines()
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            clean_response = "\n".join(lines).strip()
+        # Robust extraction of JSON block from LLM response using regex/brace delimiters
+        import re
+        json_block_match = re.search(r'```(?:json)?\n(.*?)\n```', llm_response, re.DOTALL | re.IGNORECASE)
+        if json_block_match:
+            clean_response = json_block_match.group(1).strip()
+        else:
+            # Fallback to brace boundaries
+            start_idx = llm_response.find('{')
+            end_idx = llm_response.rfind('}')
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                clean_response = llm_response[start_idx:end_idx+1].strip()
+            else:
+                clean_response = llm_response.strip()
             
         new_config = json.loads(clean_response)
         

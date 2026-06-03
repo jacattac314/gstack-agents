@@ -1,0 +1,738 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=1;">
+  <meta name="referrer" content="origin">
+  <meta name="HandheldFriendly" content="true" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>python agent development at DuckDuckGo</title>
+  <link title="DuckDuckGo (Lite)" type="application/opensearchdescription+xml" rel="search" href="//duckduckgo.com/opensearch_lite_v2.xml">
+  <link href="//duckduckgo.com/favicon.ico" rel="shortcut icon" />
+  <link rel="icon" href="//duckduckgo.com/favicon.ico" type="image/x-icon" />
+  <link id="icon60" rel="apple-touch-icon" href="//duckduckgo.com/assets/icons/meta/DDG-iOS-icon_60x60.png?v=2"/>
+  <link id="icon76" rel="apple-touch-icon" sizes="76x76" href="//duckduckgo.com/assets/icons/meta/DDG-iOS-icon_76x76.png?v=2"/>
+  <link id="icon120" rel="apple-touch-icon" sizes="120x120" href="//duckduckgo.com/assets/icons/meta/DDG-iOS-icon_120x120.png?v=2"/>
+  <link id="icon152" rel="apple-touch-icon" sizes="152x152" href="//duckduckgo.com/assets/icons/meta/DDG-iOS-icon_152x152.png?v=2"/>
+  <link rel="image_src" href="//duckduckgo.com/assets/icons/meta/DDG-icon_256x256.png">
+  <link rel="stylesheet" media="handheld, all" href="//duckduckgo.com/dist/lr.48ddfe4eadf6a534e93f.css" type="text/css"/>
+</head>
+
+<body>
+  <p class='extra'>&nbsp;</p>
+  <div class="header">
+    DuckDuckGo
+  </div>
+  <p class='extra'>&nbsp;</p>
+
+  <form action="/lite/" method="post">
+      <input class='query' type="text" size="40" name="q" value="python agent development">
+      <input class='submit' type="submit" value="Search">
+      
+      
+      
+      
+
+      <div class="filters">
+        <select class="submit" name="kl">
+          
+            <option value="" >All Regions</option>
+          
+            <option value="ar-es" >Argentina</option>
+          
+            <option value="au-en" >Australia</option>
+          
+            <option value="at-de" >Austria</option>
+          
+            <option value="be-fr" >Belgium (fr)</option>
+          
+            <option value="be-nl" >Belgium (nl)</option>
+          
+            <option value="br-pt" >Brazil</option>
+          
+            <option value="bg-bg" >Bulgaria</option>
+          
+            <option value="ca-en" >Canada (en)</option>
+          
+            <option value="ca-fr" >Canada (fr)</option>
+          
+            <option value="ct-ca" >Catalonia</option>
+          
+            <option value="cl-es" >Chile</option>
+          
+            <option value="cn-zh" >China</option>
+          
+            <option value="co-es" >Colombia</option>
+          
+            <option value="hr-hr" >Croatia</option>
+          
+            <option value="cz-cs" >Czech Republic</option>
+          
+            <option value="dk-da" >Denmark</option>
+          
+            <option value="ee-et" >Estonia</option>
+          
+            <option value="fi-fi" >Finland</option>
+          
+            <option value="fr-fr" >France</option>
+          
+            <option value="de-de" >Germany</option>
+          
+            <option value="gr-el" >Greece</option>
+          
+            <option value="hk-tzh" >Hong Kong</option>
+          
+            <option value="hu-hu" >Hungary</option>
+          
+            <option value="is-is" >Iceland</option>
+          
+            <option value="in-en" >India (en)</option>
+          
+            <option value="id-en" >Indonesia (en)</option>
+          
+            <option value="ie-en" >Ireland</option>
+          
+            <option value="il-en" >Israel (en)</option>
+          
+            <option value="it-it" >Italy</option>
+          
+            <option value="jp-jp" >Japan</option>
+          
+            <option value="kr-kr" >Korea</option>
+          
+            <option value="lv-lv" >Latvia</option>
+          
+            <option value="lt-lt" >Lithuania</option>
+          
+            <option value="my-en" >Malaysia (en)</option>
+          
+            <option value="mx-es" >Mexico</option>
+          
+            <option value="nl-nl" >Netherlands</option>
+          
+            <option value="nz-en" >New Zealand</option>
+          
+            <option value="no-no" >Norway</option>
+          
+            <option value="pk-en" >Pakistan (en)</option>
+          
+            <option value="pe-es" >Peru</option>
+          
+            <option value="ph-en" >Philippines (en)</option>
+          
+            <option value="pl-pl" >Poland</option>
+          
+            <option value="pt-pt" >Portugal</option>
+          
+            <option value="ro-ro" >Romania</option>
+          
+            <option value="ru-ru" >Russia</option>
+          
+            <option value="xa-ar" >Saudi Arabia</option>
+          
+            <option value="sg-en" >Singapore</option>
+          
+            <option value="sk-sk" >Slovakia</option>
+          
+            <option value="sl-sl" >Slovenia</option>
+          
+            <option value="za-en" >South Africa</option>
+          
+            <option value="es-ca" >Spain (ca)</option>
+          
+            <option value="es-es" >Spain (es)</option>
+          
+            <option value="se-sv" >Sweden</option>
+          
+            <option value="ch-de" >Switzerland (de)</option>
+          
+            <option value="ch-fr" >Switzerland (fr)</option>
+          
+            <option value="tw-tzh" >Taiwan</option>
+          
+            <option value="th-en" >Thailand (en)</option>
+          
+            <option value="tr-tr" >Turkey</option>
+          
+            <option value="us-en" >US (English)</option>
+          
+            <option value="us-es" >US (Spanish)</option>
+          
+            <option value="ua-uk" >Ukraine</option>
+          
+            <option value="uk-en" >United Kingdom</option>
+          
+            <option value="vn-en" >Vietnam (en)</option>
+          
+        </select>
+
+        <select class="submit" name="df">
+          
+            <option value="" selected>Any Time</option>
+          
+            <option value="d" >Past Day</option>
+          
+            <option value="w" >Past Week</option>
+          
+            <option value="m" >Past Month</option>
+          
+            <option value="y" >Past Year</option>
+          
+        </select>
+      </div>
+  </form>
+
+  
+    <p class="extra">&nbsp;</p>
+    <table border="0">
+      <tr>
+        <td>
+          
+        </td>
+        <td>
+          
+            <!-- Next Page Button Sub-template -->
+<form class="next_form" action="/lite/" method="post">
+    <input type="submit" class='navbutton' value="Next Page &gt;">
+    <input type="hidden" name="q" value="python agent development">
+    <input type="hidden" name="s" value="10">
+    <input type="hidden" name="nextParams" value="">
+    <input type="hidden" name="v" value="l">
+    <input type="hidden" name="o" value="json">
+    <input type="hidden" name="dc" value="11">
+    <input type="hidden" name="api" value="d.js">
+    <input type="hidden" name="vqd" value="4-238076104892362145145912187683551252174">
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    
+    
+    
+      <input name="kl" value="wt-wt" type="hidden">
+    
+    
+    
+    
+</form>
+          
+        </td>
+      </tr>
+    </table>
+  
+
+  
+
+  <p class='extra'>&nbsp;</p>
+
+  <table border="0">
+    
+  </table>
+
+  <table border="0">
+    
+      
+      <!-- Web results are present -->
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    1.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://adk.dev/" class='result-link'>Agent Development Kit (ADK) - Agent Development Kit (ADK)</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    Build production <b>agents</b>, not prototypes. ADK is the open-source <b>agent</b> <b>development</b> framework that lets you build, debug, and deploy reliable AI <b>agents</b> at enterprise scale. Available in <b>Python</b>, TypeScript, Go, Java, and Kotlin.
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>adk.dev</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    2.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://github.com/google/adk-python" class='result-link'>Agent Development Kit (ADK) 2.0 - GitHub</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    <b>Agent</b> <b>Development</b> Kit (ADK) 2.0 An open-source, code-first <b>Python</b> framework for building, evaluating, and deploying sophisticated AI <b>agents</b> with flexibility and control. Important Links: Docs, Samples &amp; ADK Web. ⚠️ BREAKING CHANGES FROM 1.x This release includes breaking changes to the <b>agent</b> API, event model, and session schema.
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>github.com/google/adk-python</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    3.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://openai.github.io/openai-agents-python/" class='result-link'>OpenAI Agents SDK</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    Here are the main features of the SDK: <b>Agent</b> loop: A built-in <b>agent</b> loop that handles tool invocation, sends results back to the LLM, and continues until the task is complete. <b>Python</b>-first: Use built-in language features to orchestrate and chain <b>agents</b>, rather than needing to learn new abstractions.
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>openai.github.io/openai-agents-python/</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    4.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://medium.com/online-inference/building-and-ai-agent-from-scratch-in-python-tutorial-3a106902bc37" class='result-link'>Building and AI agent from scratch in Python (tutorial)</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    Building an AI <b>agent</b> in <b>Python</b> lets you turn large language models into independent assistants that can reason, call tools, and automate…
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>medium.com/online-inference/building-and-ai-agent-from-scratch-in-python-tutorial-3a106902bc37</span>
+                  
+                    &nbsp;&nbsp;&nbsp;
+                    <span class='timestamp'>2025-11-18T00:00:00.0000000</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    5.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://learn.microsoft.com/en-us/microsoft-agent-365/developer/quickstart-python-agent-framework" class='result-link'>Quickstart: Set up and run the Python Agent framework sample agent</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    In this Quickstart, walk through setting up a working <b>Python</b> <b>Agent</b> framework <b>agent</b> using <b>Agent</b> 365 for tooling, notifications, observability, and testing the <b>agent</b> using <b>Agents</b> Playground and Teams.
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>learn.microsoft.com/en-us/microsoft-agent-365/developer/quickstart-python-agent-framework</span>
+                  
+                    &nbsp;&nbsp;&nbsp;
+                    <span class='timestamp'>2026-04-30T00:00:00.0000000</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    6.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://medium.com/@proflead/how-to-build-ai-agents-from-scratch-full-step-by-step-guide-using-python-1fd4b096a577" class='result-link'>How to Build AI Agents From Scratch (Full Step-By-Step Guide Using Python)</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    In this article, I will show you how to build your first AI <b>agent</b> from scratch using Google&#x27;s ADK (<b>Agent</b> <b>Development</b> Kit).
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>medium.com/@proflead/how-to-build-ai-agents-from-scratch-full-step-by-step-guide-using-python-1fd4b096a577</span>
+                  
+                    &nbsp;&nbsp;&nbsp;
+                    <span class='timestamp'>2025-12-07T00:00:00.0000000</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    7.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://www.freecodecamp.org/news/build-an-ai-coding-agent-with-python-and-gemini/" class='result-link'>How to Build an AI Coding Agent with Python and Gemini</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    In this handbook, you&#x27;ll build a basic version of Claude Code using Google&#x27;s free Gemini API. If you&#x27;ve ever used Cursor or Claude Code as an &quot;agentic&quot; AI code editor, then you should be familiar with what we&#x27;ll be building here. As long as you have an LLM at your disposal, it&#x27;s actually surprisingly simple to build a (somewhat) effective custom <b>agent</b>. This a completely free text-based ...
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>www.freecodecamp.org/news/build-an-ai-coding-agent-with-python-and-gemini/</span>
+                  
+                    &nbsp;&nbsp;&nbsp;
+                    <span class='timestamp'>2025-10-02T00:00:00.0000000</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    8.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://ofox.ai/blog/ai-agent-development-python-guide-2026/" class='result-link'>Building AI Agents from Scratch with Python: A Practical Guide (2026)</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    Building AI <b>Agents</b> from Scratch with <b>Python</b>: A Practical Guide (2026) TL;DR AI <b>agents</b> go beyond chatbots by taking autonomous actions — calling APIs, executing code, and making decisions in a loop. This guide builds <b>agents</b> from scratch in <b>Python</b>, starting with function calling fundamentals and progressing to a complete working <b>agent</b> with memory, multi-tool orchestration, and the ReAct ...
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>ofox.ai/blog/ai-agent-development-python-guide-2026/</span>
+                  
+                    &nbsp;&nbsp;&nbsp;
+                    <span class='timestamp'>2026-03-08T00:00:00.0000000</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    9.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://github.com/microsoft/agent-framework" class='result-link'>GitHub - microsoft/agent-framework: A framework for building ...</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    Microsoft <b>Agent</b> Framework (MAF) is an open, multi-language framework for building production-grade AI <b>agents</b> and multi-<b>agent</b> workflows in .NET and <b>Python</b>. Microsoft <b>Agent</b> Framework is built for teams taking <b>agents</b> from prototype to production. It provides a consistent foundation for building, orchestrating, and operating <b>agent</b> systems across <b>Python</b> and .NET, while keeping architecture choices ...
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>github.com/microsoft/agent-framework</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+        
+            <tr>
+              
+                <td valign="top">
+                  
+                    10.&nbsp;
+                  
+                </td>
+                <td>
+                  <a rel="nofollow" href="https://developer.microsoft.com/en-us/reactor/series/S-1631/" class='result-link'>Python + Agents: Building AI agents and workflows with Agent Framework ...</a>
+                </td>
+                
+            </tr>
+
+            
+              
+                <!-- Only show abstract separately if there's a click URL (not EOF) -->
+                <tr>
+                  <td>&nbsp;&nbsp;&nbsp;</td>
+                  <td class='result-snippet'>
+                    <b>Python</b> + <b>Agents</b>: Building AI <b>agents</b> and workflows with <b>Agent</b> Framework Ready to get started with AI and the latest technologies? Microsoft Reactor provides events, training, and community resources to help developers, entrepreneurs and startups build on AI technology and more. Join us!
+                  </td>
+                </tr>
+              
+            
+
+            
+              <tr>
+                <td>&nbsp;&nbsp;&nbsp;</td>
+                <td>
+                  <span class='link-text'>developer.microsoft.com/en-us/reactor/series/S-1631/</span>
+                  
+                </td>
+              </tr>
+            
+
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+        
+      
+    
+
+    
+      
+      <tr>
+        <td colspan=2>
+          
+          
+            <!-- Next Page Button Sub-template -->
+<form class="next_form" action="/lite/" method="post">
+    <input type="submit" class='navbutton' value="Next Page &gt;">
+    <input type="hidden" name="q" value="python agent development">
+    <input type="hidden" name="s" value="10">
+    <input type="hidden" name="nextParams" value="">
+    <input type="hidden" name="v" value="l">
+    <input type="hidden" name="o" value="json">
+    <input type="hidden" name="dc" value="11">
+    <input type="hidden" name="api" value="d.js">
+    <input type="hidden" name="vqd" value="4-238076104892362145145912187683551252174">
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    
+    
+    
+      <input name="kl" value="wt-wt" type="hidden">
+    
+    
+    
+    
+</form>
+          
+          
+        </td>
+      </tr>
+    
+  </table>
+
+  <p class='extra'>&nbsp;</p>
+
+  <form action="/lite/" method="post">
+      <input class='query' type="text" size="40" name="q" value="python agent development" >
+      <input class='submit' type="submit" value="Search">
+      
+      
+      
+      
+      
+        <input name="kl" value="wt-wt" type="hidden">
+      
+  </form>
+
+  <p class='extra'>&nbsp;</p>
+
+  
+    <img src="//duckduckgo.com/t/sl_l"/>
+  
+  <div id='end-spacer'>&nbsp;</div>
+
+</body>
+</html>
