@@ -209,18 +209,76 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.runway-title {
+.runway-presets-header {
   position: absolute;
-  top: 16px;
+  top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 3px;
-  color: rgba(255, 255, 255, 0.85);
-  text-transform: uppercase;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-  font-family: 'Outfit', 'Inter', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 100;
+  background: rgba(7, 11, 19, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 4px 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.runway-presets-header select {
+  font-size: 10px;
+  height: 24px;
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #fff;
+  border-radius: 12px;
+  cursor: pointer;
+  outline: none;
+  width: 140px;
+  transition: border-color 0.2s ease;
+}
+
+.runway-presets-header select:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.runway-presets-header button {
+  font-size: 9px !important;
+  height: 24px !important;
+  padding: 0 10px !important;
+  margin: 0 !important;
+  border-radius: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: white !important;
+}
+
+.runway-presets-header button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.runway-presets-header input {
+  font-size: 10px;
+  height: 24px;
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  width: 90px;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.runway-presets-header input:hover,
+.runway-presets-header input:focus {
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .glass-runway {

@@ -176,24 +176,6 @@
           <div id="workflow-panel-body" class="flex-col gap-sm margin-top-md" style="display: none;">
             <p class="panel-desc">Customize which agents participate in your sprint cycle and define custom roles.</p>
             
-            <!-- Team Configuration Presets -->
-            <div class="flex-col gap-xs" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-              <span style="font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.8); font-family: var(--font-sans); margin-bottom: 4px; display: block;">Team Configuration Presets</span>
-              
-              <div class="flex-row gap-xs" style="display: flex; gap: 6px; align-items: center;">
-                <select id="preset-select" class="premium-select" style="font-size:10px; height:26px; padding:2px 8px; flex-grow: 1; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); color: #fff; border-radius: 4px; cursor: pointer; outline: none;"></select>
-                <button id="preset-load-btn" class="glow-button secondary" style="font-size:9px; height:26px; padding:0 10px; margin: 0;">
-                  <span>Load</span>
-                </button>
-              </div>
-              <div class="flex-row gap-xs" style="display: flex; gap: 6px; align-items: center; margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 6px;">
-                <input type="text" id="preset-name-input" class="premium-input" placeholder="New Preset Name" style="font-size:10px; height:26px; padding:4px 8px; flex-grow: 1;">
-                <button id="preset-save-btn" class="glow-button secondary" style="font-size:9px; height:26px; padding:0 10px; margin: 0;">
-                  <span>Save Preset</span>
-                </button>
-              </div>
-            </div>
-            
             <!-- Draggable Agents Pool -->
             <div class="flex-col gap-xs" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 10px; margin-bottom: 8px;">
               <span style="font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.8); font-family: var(--font-sans); margin-bottom: 4px; display: block;">Drag Agents onto Timeline Nodes or Stage Rows:</span>
@@ -335,7 +317,18 @@
         
         <!-- Unified Clickable 3D AGI Perspective Runway -->
         <div class="runway-viewport">
-          <div class="runway-title">AGI DEVELOPMENT WORKFLOW</div>
+          <div class="runway-presets-header">
+            <span style="font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, 0.5); letter-spacing: 1.5px; font-family: 'Outfit', sans-serif; margin-right: 4px;">TEAM PRESET:</span>
+            <select id="preset-select"></select>
+            <button id="preset-load-btn" class="glow-button secondary">
+              <span>Load ⚙️</span>
+            </button>
+            <div style="width: 1px; height: 12px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+            <input type="text" id="preset-name-input" placeholder="New Name...">
+            <button id="preset-save-btn" class="glow-button secondary">
+              <span>Save 💾</span>
+            </button>
+          </div>
           
           <!-- LEFT SIDE: Live Preview & Terminal Logs Container -->
           <div class="runway-left-panel">
